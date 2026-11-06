@@ -114,7 +114,7 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
  .tabs button .ic{font-size:19px;line-height:1}
  .tabs button.active{box-shadow:none;background:#eef2ff}
  .toolbar{position:sticky;top:0;z-index:15;background:var(--bg);padding:6px 0;margin-bottom:8px}
- .toolbar .backup{display:none}.mobileonly{display:block}
+ .toolbar{flex-wrap:wrap}.toolbar .grow{display:none}.toolbar .backup{display:inline-flex;flex:1 1 0;justify-content:center;padding:8px 10px;font-size:13px}.mobileonly{display:block}
  .compbar{width:100%}.compbar label{flex:1}.compbar select{flex:1;width:100%;padding:9px 8px}
  .kpis{grid-template-columns:1fr 1fr;gap:8px}.kpi{padding:11px 12px}.kpi strong{font-size:17px}.kpi.wide{grid-column:1/-1}
  .cards{grid-template-columns:1fr 1fr;gap:8px}.card,.panel{padding:13px;border-radius:13px}.metric strong{font-size:17px}
@@ -440,11 +440,10 @@ function catOf(item){return item.type==='card'?{cat:CARD_CAT,sug:false}:catOfRec
 function catOptions(sel){return cats().map(c=>`<option value="${esc(c.id)}"${c.id===sel?' selected':''}>${esc(c.name)}</option>`).join('')}
 function ctag(item){const{cat,sug}=catOf(item);return `<span class="ctag${sug?' sug':''}"><span class="dot" style="background:${cat.color};margin:0"></span>${esc(cat.name)}${sug?' · sugerida':''}</span>`}
 
-/* ---------- Dados iniciais (iguais à v1; usados só quando não há nada salvo) ---------- */
-function seedData(){return{
- fixed:[{id:1,name:'Condomínio',day:10,value:500},{id:2,name:'Internet',day:8,value:150},{id:3,name:'Luz',day:30,value:500},{id:4,name:'Celular (casal)',day:25,value:130},{id:5,name:'Perua Escolar',day:20,value:400},{id:6,name:'Seguro Moto',day:15,value:240},{id:7,name:'Financiamento Moto',day:15,value:900}],
- installments:[{id:11,name:'Empréstimo Mercado Livre',value:473.78,qty:10,day:10,year:2026,month:9},{id:12,name:'Celular (parcelamento aparelho)',value:470.13,qty:5,day:10,year:2026,month:9},{id:13,name:'Negociação Santander',value:178.49,qty:15,day:20,year:2026,month:10},{id:14,name:'Vera Calçados',value:200,qty:3,day:20,year:2026,month:9},{id:15,name:'Empréstimo Shoppe',value:226.56,qty:3,day:25,year:2026,month:9},{id:16,name:'Rener',value:135,qty:4,day:10,year:2026,month:10},{id:17,name:'C&A',value:70,qty:5,day:25,year:2026,month:10}],
- cards:{'2026-10':{visa:2053.59,master:936.77}},paid:{},nextId:100}}
+/* ---------- Base inicial zerada (usada só quando não há nada salvo) ---------- */
+function seedData(){const d=new Date();return{
+ fixed:[],installments:[],cards:{},paid:{},oneOffs:[],incomes:[],nextId:1,
+ settings:{startKey:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),pendingStart:null,incomeBasis:'cash',satBD:true}}}
 
 /* ---------- Migração segura: só ACRESCENTA campos ---------- */
 function migrate(d){
