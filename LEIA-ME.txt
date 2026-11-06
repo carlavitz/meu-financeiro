@@ -1,0 +1,19 @@
+MEU FINANCEIRO — PACOTE PWA
+
+Como publicar:
+1. Extraia este ZIP.
+2. Envie TODOS os arquivos e a pasta icons para a raiz do repositório GitHub que alimenta a Vercel.
+3. Substitua o index.html antigo pelo index.html deste pacote.
+4. Mantenha manifest.json e sw.js na raiz; mantenha os três PNGs dentro da pasta icons.
+5. Faça commit/push e aguarde a nova implantação da Vercel.
+
+Depois de publicar:
+1. No Android, abra o endereço do site pelo Google Chrome.
+2. Atualize a página. Se necessário, feche e abra novamente.
+3. Toque no menu ⋮ e escolha “Instalar app” ou “Adicionar à tela inicial”.
+4. Confirme a instalação.
+
+Observações:
+- Os dados continuam no armazenamento local do navegador/aparelho. Não há sincronização automática entre dispositivos.
+- O modo offline mantém os arquivos do aplicativo disponíveis, mas não é um backup dos dados.
+- Antes de atualizar, exporte um backup pelo botão “Exportar backup”.
