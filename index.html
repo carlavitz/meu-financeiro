@@ -59,7 +59,7 @@ main,.panel{max-width:100%}
 .legend button.sel{border-color:var(--primary);background:#eef2ff}
 .dot{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:7px;vertical-align:-1px;flex:0 0 auto}
 .seg{cursor:pointer}.hit{cursor:pointer}
-.detail{background:#f8f9fd;border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-top:12px;font-size:14px;line-height:1.45}
+.detail{scroll-margin-top:70px;background:#f8f9fd;border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-top:12px;font-size:14px;line-height:1.45}
 .seg-toggle{display:inline-flex;border:1px solid #d8dce7;border-radius:9px;overflow:hidden}
 .seg-toggle button{border:0;border-radius:0;padding:6px 11px;min-height:34px;font-size:13px}.seg-toggle button.active{background:var(--primary);color:white}
 .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;white-space:nowrap}
@@ -79,13 +79,18 @@ main,.panel{max-width:100%}
 .pitem{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 0;border-bottom:1px dashed #f3d3d3}
 .neg{color:var(--red)}.pos{color:var(--green)}
 .catlist{display:flex;flex-wrap:wrap;gap:8px}.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:20px;padding:5px 6px 5px 10px;background:white;font-size:13px}
-.chip button{min-height:28px;padding:3px 8px;font-size:12px}
-.clsrow{display:grid;grid-template-columns:1fr 210px;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.chip button{min-height:28px;padding:3px 8px;font-size:12px}.chip .chipname{border:0;background:transparent;font-size:13px;font-weight:500;padding:3px 4px;display:inline-flex;align-items:center;gap:3px}.chip.sel{border-color:var(--primary);background:#eef2ff}
+.clsrow{display:grid;grid-template-columns:1fr 280px;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
 .clsrow select{width:100%;padding:8px}
 #toast{position:fixed;left:50%;bottom:calc(var(--navh) + 18px);transform:translateX(-50%) translateY(30px);background:#172033;color:white;padding:12px 18px;border-radius:11px;opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:92vw;text-align:center;font-size:14px}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}#toast.error{background:#b91c1c}#toast.ok{background:#166534}
 #updateBar{display:none;position:fixed;left:12px;right:12px;bottom:calc(var(--navh) + 12px);max-width:520px;margin:auto;background:#312e81;color:white;border-radius:13px;padding:12px 14px;z-index:60;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 8px 24px #0003}
 #updateBar button{background:white;color:#312e81;border:0}
+dialog#editDlg{border:0;border-radius:16px;padding:18px;width:min(580px,94vw);max-height:90vh;overflow:auto;box-shadow:0 20px 60px #0004;color:var(--ink)}
+dialog#editDlg::backdrop{background:#17203380}
+dialog#editDlg h2{margin:0 0 4px;font-size:18px}
+.tagline{display:inline-flex;gap:4px;flex-wrap:wrap;margin-top:3px}
+.chk{display:flex!important;gap:8px;align-items:center;color:var(--ink)!important;font-size:14px!important}.chk input{width:auto!important;margin:0!important}
 footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:var(--muted)}
 .editing-banner{background:#fef3c7;color:#92400e;border-radius:9px;padding:8px 11px;font-size:13px}
 .periodbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
@@ -122,6 +127,7 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
  .rtable tfoot tr{background:#eef2ff}
  .clsrow{grid-template-columns:1fr}
  .chartbox{margin:0 -4px}
+ dialog#editDlg{width:100vw;max-width:100vw;margin:auto 0 0;border-radius:18px 18px 0 0;max-height:92vh;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
 }
 </style>
 </head>
@@ -152,6 +158,7 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
 <section id="tab-dash" class="tab active">
 <div class="periodbar">
  <select id="period" aria-label="Período do painel"></select>
+ <select id="incBasis" aria-label="Critério das receitas"><option value="cash">Receitas pelo mês do recebimento (caixa)</option><option value="ref">Receitas pelo mês de referência (competência)</option></select>
  <span class="muted" id="periodInfo" style="font-size:13px"></span>
 </div>
 <div id="dashEmpty" class="panel empty" style="display:none">Ainda não há meses com registros (receitas, avulsas, faturas ou pagamentos). Comece pela aba <b>Mês</b>.</div>
@@ -223,11 +230,13 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
 <div class="card metric"><small>Total a pagar no mês</small><strong id="mToPay">R$ 0</strong><span id="mToPaySub">Em aberto do mês + pendências</span></div>
 </div>
 
+<div class="detail" id="preStart" style="display:none;margin:0 0 14px;background:#fef9c3;border-color:#fde68a"></div>
 <div class="panel pend" id="pendPanel"><h2>⚠️ Pendências acumuladas de meses anteriores <span class="badge b-bad" id="pendBadge"></span></h2>
 <div id="pendList"></div>
 <div class="formgrid section" style="align-items:end">
+ <label>Início do controle financeiro<select id="ctrlStart"></select></label>
  <label>Controlar pendências a partir de<select id="pendStart"></select></label>
- <div class="muted" style="font-size:12px">Itens sem "Pago" nos meses anteriores (desde o mês ao lado) somam-se aqui até serem pagos.</div>
+ <div class="muted full" style="font-size:12px">Meses anteriores ao início do controle ficam zerados (nada é apagado). Itens sem "Pago" a partir do mês de pendências somam-se aqui até serem pagos.</div>
 </div>
 </div>
 
@@ -238,7 +247,10 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
 <label class="full">Descrição da receita<input id="rName" required maxlength="80" placeholder="Ex.: Salário, renda extra"></label>
 <label>Dia<input id="rDay" type="number" min="1" max="31" value="5" required inputmode="numeric"></label>
 <label>Valor (R$)<input id="rValue" type="number" min="0.01" step=".01" required inputmode="decimal"></label>
-<label class="full" style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px"><input id="rRecurring" type="checkbox" style="width:auto;margin:0"> Repetir todos os meses a partir deste (receita recorrente)</label>
+<label class="full chk"><input id="rRecurring" type="checkbox"> Repetir todos os meses a partir deste (receita recorrente)</label>
+<label class="full chk"><input id="rBD5" type="checkbox"> Recebo no 5º dia útil (o dia é calculado a cada mês) <small class="muted" id="rBD5info"></small></label>
+<label class="full">Referente a<select id="rRef"><option value="">Não informar</option><option value="-1">Mês anterior (ex.: salário de outubro pago em novembro)</option><option value="0">Ao próprio mês</option></select></label>
+<label class="full chk"><input id="satBD" type="checkbox"> Contar sábado como dia útil na contagem do 5º dia útil</label>
 <div class="full"><button class="primary" type="submit">Salvar receita no mês</button> <button type="button" onclick="$('incomeForm').style.display='none'">Cancelar</button></div></form>
 <div style="overflow-x:auto;margin-top:8px"><table class="rtable"><thead><tr><th>Dia</th><th>Descrição</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody id="calendar"></tbody></table></div>
 <h2 style="margin-top:22px">Despesas avulsas do mês</h2>
@@ -292,6 +304,8 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
 <section id="tab-cat" class="tab">
 <div class="panel"><h2>Suas categorias</h2>
 <div class="catlist" id="catChips"></div>
+<p class="muted" style="font-size:12px;margin:8px 0 0">Toque no nome de uma categoria para ver os lançamentos dela.</p>
+<div class="detail" id="chipDetail" style="display:none"></div>
 <form id="catForm" class="section" style="display:flex;gap:8px;flex-wrap:wrap" novalidate>
 <input id="catName" maxlength="40" placeholder="Nova categoria (ex.: Pets)" style="flex:1;min-width:180px">
 <button class="primary" type="submit">＋ Adicionar</button>
@@ -357,12 +371,17 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
 <p>🔒 Dados salvos <b>somente neste navegador/aparelho</b>. Não sincronizam entre celular e computador — use Exportar/Importar backup. Limpar os dados do navegador apaga os lançamentos.</p>
 <p>Meu Financeiro · versão <span id="appVersion"></span></p>
 </footer>
+<dialog id="editDlg"><form id="editForm" class="formgrid" novalidate>
+<div class="full"><h2 id="edTitle"></h2><div id="edScope"></div></div>
+<div class="full formgrid" id="edFields" style="padding:0"></div>
+<div class="full" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button type="button" id="edDelete" class="mini" style="color:var(--red)">Excluir</button><span style="flex:1"></span><button type="button" onclick="closeEdit()">Cancelar</button><button class="primary" type="submit">Salvar alterações</button></div>
+</form></dialog>
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="updateBar"><span>Nova versão disponível.</span><button type="button" id="updateBtn">Atualizar agora</button></div>
 
 <script>
 'use strict';
-const APP_VERSION='2.1.0';
+const APP_VERSION='2.3.0';
 const STORAGE_KEY='meuFinanceiroV1';   // mesma chave da versão 1: dados existentes preservados
 const SCHEMA_VERSION=3;
 const months=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -429,6 +448,9 @@ function migrate(d){
  if(!d.categories.length)d.categories=DEFAULT_CATS.map(c=>({...c}));
  if(!d.categories.some(c=>c.id==='outros'))d.categories.push({id:'outros',name:'Outros',color:'#94a3b8'});
  d.settings=obj(d.settings);if(!('pendingStart' in d.settings))d.settings.pendingStart=null;
+ if(!d.settings.incomeBasis)d.settings.incomeBasis='cash';
+ if(!('startKey' in d.settings))d.settings.startKey='2026-11'; // início do controle financeiro (meses anteriores não são considerados)if(!('satBD' in d.settings))d.settings.satBD=true;
+ d.overrides=obj(d.overrides);
  let maxId=0;[d.fixed,d.installments,d.oneOffs,d.incomes].forEach(a=>a.forEach(x=>{const n=+x.id;if(isFinite(n)&&n>maxId)maxId=n}));
  d.nextId=Math.max(+d.nextId||0,maxId+1);
  d.schemaVersion=SCHEMA_VERSION;return d;
@@ -455,7 +477,7 @@ function num(id,{min=0,max=Infinity,int=false,label='Valor',required=true}={}){
  return int?v:r2(v)}
 function txt(id,label){const v=$(id).value.trim();if(!v)throw new Error(`Informe ${label}.`);return v.slice(0,80)}
 function guard(fn){return e=>{e.preventDefault();try{fn()}catch(err){toast(err.message||'Verifique os campos.','error')}}}
-const state={tab:'dash',evoSel:null,donutSel:null,donutMode:'cat',resSel:null,rankSel:null};
+const state={chipSel:null,scrollDetail:false,tab:'dash',evoSel:null,donutSel:null,donutMode:'cat',resSel:null,rankSel:null};
 
 /* ---------- Competência ---------- */
 function initSelectors(){
@@ -470,16 +492,25 @@ function ym(){const y=+$('year').value,m=+$('month').value;return{y,m,seq:y*12+m
 function goMonth(s){$('year').value=Math.floor(s/12);$('month').value=s%12;render();showTab('lanc')}
 
 /* ---------- Motor de cálculo ---------- */
-function incomesFor(s){return data.incomes.filter(x=>{if(x.recurring){const st=keySeq(x.monthKey);return s>=st&&(!x.endKey||s<=keySeq(x.endKey))}return x.monthKey===seqKey(s)})}
+/* Dias úteis: domingos e feriados nacionais excluídos; sábado conforme configuração */
+function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da)}
+function holidays(y){const H=new Set(['01-01','04-21','05-01','09-07','10-12','11-02','11-15','11-20','12-25']),gf=easter(y);gf.setDate(gf.getDate()-2);H.add(String(gf.getMonth()+1).padStart(2,'0')+'-'+String(gf.getDate()).padStart(2,'0'));return H}
+function businessDay(s,n=5){const y=Math.floor(s/12),m=s%12,H=holidays(y),sat=data.settings.satBD!==false;let c=0;
+ for(let d=1;d<=31;d++){const dt=new Date(y,m,d);if(dt.getMonth()!==m)break;const w=dt.getDay(),md=String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(w===0||(w===6&&!sat)||H.has(md))continue;if(++c===n)return d}return 28}
+/* Critério das receitas: caixa (mês do recebimento) ou referência (competência) */
+const incOff=x=>data.settings.incomeBasis==='ref'?(+x.refOffset||0):0;
+function incomesFor(s){return data.incomes.filter(x=>{const r=s-incOff(x);if(x.recurring){const st=keySeq(x.monthKey);return r>=st&&(!x.endKey||r<=keySeq(x.endKey))}return x.monthKey===seqKey(r)})}
+const startSeq=()=>data.settings.startKey?keySeq(data.settings.startKey):-Infinity;
 function paymentsFor(s){
- const k=seqKey(s),arr=[];
+ const k=seqKey(s),arr=[];if(s<startSeq())return arr; // antes do início do controle: nada é considerado
  data.fixed.forEach(x=>arr.push({id:'f'+x.id,type:'fixed',name:x.name,day:x.day,value:+x.value||0,ref:x}));
  data.installments.forEach(x=>{const st=(+x.year)*12+(+x.month),en=st+(+x.qty)-1;if(s>=st&&s<=en)arr.push({id:'i'+x.id,type:'install',name:x.name+` (${s-st+1}/${x.qty})`,day:x.day,value:+x.value||0,ref:x,remaining:en-s+1,end:en})});
  const c=data.cards[k]||{visa:0,master:0};
  if(+c.visa)arr.push({id:'visa',type:'card',name:'Fatura Visa',day:8,value:+c.visa});
  if(+c.master)arr.push({id:'master',type:'card',name:'Fatura Mastercard',day:21,value:+c.master});
+ arr.forEach(x=>{const o=data.overrides[k+'_'+x.id];if(o){if(o.value!=null&&isFinite(o.value))x.value=+o.value;if(o.day)x.day=+o.day;x.adjusted=true}});
  data.oneOffs.filter(x=>x.monthKey===k).forEach(x=>arr.push({id:'o'+x.id,type:'oneoff',name:x.name,day:x.day,value:+x.value||0,ref:x}));
- incomesFor(s).forEach(x=>arr.push({id:'r'+x.id,type:'income',name:'↗ '+x.name+(x.recurring?' (recorrente)':''),day:x.day,value:+x.value||0,ref:x}));
+ incomesFor(s).forEach(x=>{const r=s-incOff(x);arr.push({id:'r'+x.id,type:'income',name:'↗ '+x.name+(x.recurring?' (recorrente)':''),day:x.bd5?businessDay(r):x.day,value:+x.value||0,ref:x,recv:r})});
  return arr.sort((a,b)=>a.day-b.day||a.name.localeCompare(b.name));
 }
 function getPayments(){return paymentsFor(ym().seq)}
@@ -502,15 +533,16 @@ const TYPES=[{k:'fixed',label:'Despesas fixas',color:'var(--c-fixed)'},{k:'cards
 /* Meses com registros: receitas, avulsas, faturas ou pagamentos marcados (até o mês atual) */
 function recordSeqs(){
  const S=new Set();
- data.incomes.forEach(x=>{const st=keySeq(x.monthKey);if(x.recurring){const en=x.endKey?keySeq(x.endKey):todaySeq;for(let s=st;s<=Math.min(en,todaySeq);s++)S.add(s)}else S.add(st)});
+ data.incomes.forEach(x=>{const o=incOff(x),st=keySeq(x.monthKey);if(x.recurring){const en=x.endKey?keySeq(x.endKey):todaySeq;for(let s=st;s<=Math.min(en,todaySeq);s++)S.add(s+o)}else S.add(st+o)});
+ Object.keys(data.overrides).forEach(k=>S.add(keySeq(k.slice(0,7))));
  data.oneOffs.forEach(x=>S.add(keySeq(x.monthKey)));
  Object.entries(data.cards).forEach(([k,c])=>{if(+c.visa||+c.master)S.add(keySeq(k))});
  Object.keys(data.paid).forEach(k=>S.add(keySeq(k.slice(0,7))));
- return[...S].filter(s=>isFinite(s)&&s<=todaySeq).sort((a,b)=>a-b);
+ return[...S].filter(s=>isFinite(s)&&s<=todaySeq&&s>=startSeq()).sort((a,b)=>a-b);
 }
 /* Pendências: itens não pagos em meses anteriores acumulam para os meses seguintes */
-function defaultPendStart(){const c=[...recordSeqs(),...data.installments.map(x=>(+x.year)*12+(+x.month)).filter(s=>s<=todaySeq)];return c.length?Math.min(...c):todaySeq}
-function pendingStartSeq(){return data.settings.pendingStart?keySeq(data.settings.pendingStart):defaultPendStart()}
+function defaultPendStart(){const st=startSeq(),c=[...recordSeqs(),...data.installments.map(x=>(+x.year)*12+(+x.month)).filter(s=>s<=todaySeq&&s>=st)];return c.length?Math.min(...c):Math.max(todaySeq,st===-Infinity?todaySeq:st)}
+function pendingStartSeq(){const st=startSeq(),p=data.settings.pendingStart?keySeq(data.settings.pendingStart):defaultPendStart();return Math.max(p,st===-Infinity?p:st)}
 function pendingBefore(M){const out=[],st=pendingStartSeq(),en=Math.min(M-1,todaySeq);
  for(let s=st;s<=en;s++)paymentsFor(s).forEach(x=>{if(x.type!=='income'&&!isPaid(s,x.id))out.push({s,x})});return out}
 
@@ -535,19 +567,22 @@ function renderLanc(cur){
  if(!pend.length)$('pendList').innerHTML='<p class="muted" style="margin:0">✅ Nenhuma pendência de meses anteriores.</p>';
  else{const g={};pend.forEach(x=>(g[x.s]=g[x.s]||[]).push(x));
   $('pendList').innerHTML=Object.keys(g).sort((a,b)=>a-b).map(s=>{s=+s;const it=g[s];return `<div class="pgroup"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${seqLabel(s)} <span class="tag t-late">${it.length} em aberto · ${money(sum(it,x=>x.x.value))}</span></b><button type="button" class="mini soft" onclick="payMonth(${s})">Pagar todos</button></div>
-  ${it.map(({x})=>`<div class="pitem"><span>${esc(x.name)}<small class="muted" style="display:block">venc. dia ${x.day} · ${money(x.value)}</small></span><button type="button" class="mini soft" onclick="payLate(${s},'${x.id}')">Pagar</button></div>`).join('')}</div>`}).join('')}
- const ps=defaultPendStart(),cs=pendingStartSeq(),opts=[];for(let s=Math.min(ps,cs)-12;s<=todaySeq;s++)opts.push(s);
+  ${it.map(({x})=>`<div class="pitem"><span>${esc(x.name)}<small class="muted" style="display:block">venc. dia ${x.day} · ${money(x.value)}</small></span><span style="white-space:nowrap"><button type="button" class="mini soft" onclick="payLate(${s},'${x.id}')">Pagar</button> <button type="button" class="mini" onclick="openItem(${s},'${x.id}')">Editar</button></span></div>`).join('')}</div>`}).join('')}
+ const ps=defaultPendStart(),cs=pendingStartSeq(),st0=startSeq(),opts=[];for(let s=Math.max(Math.min(ps,cs)-12,st0===-Infinity?-1e9:st0);s<=todaySeq;s++)opts.push(s);
+ const ss=st0===-Infinity?todaySeq:st0,so=[];for(let s=todaySeq-36;s<=todaySeq+12;s++)so.push(s);
+ $('ctrlStart').innerHTML=`<option value="">Sem limite (considerar todos os meses)</option>`+so.map(s=>`<option value="${seqKey(s)}"${data.settings.startKey===seqKey(s)?' selected':''}>${seqLabel(s)}</option>`).join('');
+ $('preStart').style.display=seq<startSeq()?'block':'none';$('preStart').innerHTML=`ℹ️ <b>${seqLabel(seq)}</b> é anterior ao início do controle (<b>${seqLabel(ss)}</b>). Os valores deste mês não são considerados em nenhum cálculo — ficam guardados, mas zerados.`;
  $('pendStart').innerHTML=opts.map(s=>`<option value="${seqKey(s)}"${s===cs?' selected':''}>${seqLabel(s)}${s===ps?' (1º mês com registros)':''}</option>`).join('');
  // Calendário
  $('calendar').innerHTML=p.map(x=>{
-  if(x.type==='income'){const rec=x.ref;const btn=rec.recurring?`<button type="button" class="mini" onclick="endIncome(${rec.id})">Encerrar</button>`:`<button type="button" class="mini" onclick="delIncome(${rec.id})">Excluir</button>`;
-   return `<tr><td data-label="Dia">${x.day}</td><td data-label="Descrição" class="title" style="color:var(--green)">${esc(x.name)}</td><td data-label="Valor" style="color:var(--green)">+ ${money(x.value)}</td><td data-label="Status"><span class="status paid">Receita</span></td><td data-label="">${btn}</td></tr>`}
+  if(x.type==='income'){const rec=x.ref,tags=[];if(rec.bd5)tags.push('5º dia útil');if(rec.refOffset!=null&&rec.refOffset!=='')tags.push('ref. '+seqShort(x.recv+(+rec.refOffset)));if(x.recv!==seq)tags.push('recebida em '+seqShort(x.recv));
+   return `<tr><td data-label="Dia">${x.day}</td><td data-label="Descrição" class="title" style="color:var(--green)"><span>${esc(x.name)}${tags.length?`<br><span class="tagline">${tags.map(t=>`<span class="ctag">${esc(t)}</span>`).join('')}</span>`:''}</span></td><td data-label="Valor" style="color:var(--green)">+ ${money(x.value)}</td><td data-label="Status"><span class="status paid">Receita</span></td><td data-label=""><button type="button" class="mini soft" onclick="openItem(${seq},'${x.id}')">Editar</button></td></tr>`}
   const paid=data.paid[key(y,m)+'_'+x.id];
-  return `<tr><td data-label="Dia">${x.day}</td><td data-label="Descrição" class="title"><span>${esc(x.name)}<br>${ctag(x)}</span></td><td data-label="Valor">${money(x.value)}</td><td data-label="Status"><span class="status ${paid?'paid':''}">${paid?'Pago':'Pendente'}${paid&&paid.date?' · '+esc(paid.date):''}</span></td><td data-label=""><button type="button" class="mini ${paid?'':'soft'}" onclick="mark('${x.id}')">${paid?'Desfazer':'Pagar'}</button></td></tr>`}).join('')||'<tr><td colspan="5" class="empty">Nenhum pagamento neste mês.</td></tr>';
- $('fixedList').innerHTML=data.fixed.map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center"><span>${esc(x.name)}<small class="muted"> dia ${x.day} · ${money(x.value)}</small><br>${ctag({type:'fixed',ref:x})}</span><span style="white-space:nowrap"><button type="button" class="mini" onclick="editFixed(${x.id})">Editar</button> <button type="button" class="mini" onclick="delFixed(${x.id})" aria-label="Excluir">×</button></span></div>`).join('')||'<p class="muted">Nenhuma despesa fixa cadastrada.</p>';
- $('oneOffList').innerHTML=data.oneOffs.filter(x=>x.monthKey===key(y,m)).map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center"><span>${esc(x.name)}<small class="muted"> dia ${x.day} · ${money(x.value)}</small><br>${ctag({type:'oneoff',ref:x})}</span><button type="button" class="mini" onclick="delOneOff(${x.id})">Excluir</button></div>`).join('')||'<p class="muted">Nenhuma despesa avulsa lançada neste mês.</p>';
+  return `<tr><td data-label="Dia">${x.day}</td><td data-label="Descrição" class="title"><span>${esc(x.name)}<br><span class="tagline">${ctag(x)}${x.adjusted?'<span class="ctag" style="background:#fef3c7">ajustado neste mês</span>':''}</span></span></td><td data-label="Valor">${money(x.value)}</td><td data-label="Status"><span class="status ${paid?'paid':''}">${paid?'Pago':'Pendente'}${paid&&paid.date?' · '+esc(paid.date):''}</span></td><td data-label=""><div class="rowactions"><button type="button" class="mini ${paid?'':'soft'}" onclick="mark('${x.id}')">${paid?'Desfazer':'Pagar'}</button><button type="button" class="mini" onclick="openItem(${seq},'${x.id}')">Editar</button></div></td></tr>`}).join('')||'<tr><td colspan="5" class="empty">Nenhum pagamento neste mês.</td></tr>';
+ $('fixedList').innerHTML=data.fixed.map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center"><span>${esc(x.name)}<small class="muted"> dia ${x.day} · ${money(x.value)}</small><br>${ctag({type:'fixed',ref:x})}</span><span style="white-space:nowrap"><button type="button" class="mini" onclick="openEdit('fixed',${x.id})">Editar</button> <button type="button" class="mini" onclick="delFixed(${x.id})" aria-label="Excluir">×</button></span></div>`).join('')||'<p class="muted">Nenhuma despesa fixa cadastrada.</p>';
+ $('oneOffList').innerHTML=data.oneOffs.filter(x=>x.monthKey===key(y,m)).map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center"><span>${esc(x.name)}<small class="muted"> dia ${x.day} · ${money(x.value)}</small><br>${ctag({type:'oneoff',ref:x})}</span><span style="white-space:nowrap"><button type="button" class="mini soft" onclick="openEdit('oneoff',${x.id},${seq})">Editar</button> <button type="button" class="mini" onclick="delOneOff(${x.id})">Excluir</button></span></div>`).join('')||'<p class="muted">Nenhuma despesa avulsa lançada neste mês.</p>';
  $('installList').innerHTML=data.installments.map(x=>{const st=(+x.year)*12+(+x.month),en=st+(+x.qty)-1;
-  return `<tr${editingInstall===x.id?' style="background:#fef9c3"':''}><td data-label="Descrição" class="title"><span>${esc(x.name)}<br>${ctag({type:'install',ref:x})}</span></td><td data-label="Parcela">${money(x.value)}<small>dia ${x.day}</small></td><td data-label="Qtd.">${x.qty}</td><td data-label="Período">${seqLabel(st)} até ${seqLabel(en)}</td><td data-label=""><div class="rowactions"><button type="button" class="mini soft" onclick="editInstall(${x.id})">Editar</button><button type="button" class="mini" onclick="delInstall(${x.id})">Excluir</button></div></td></tr>`}).join('')||'<tr><td colspan="5" class="empty">Nenhum parcelamento.</td></tr>';
+  return `<tr${editingInstall===x.id?' style="background:#fef9c3"':''}><td data-label="Descrição" class="title"><span>${esc(x.name)}<br>${ctag({type:'install',ref:x})}</span></td><td data-label="Parcela">${money(x.value)}<small>dia ${x.day}</small></td><td data-label="Qtd.">${x.qty}</td><td data-label="Período">${seqLabel(st)} até ${seqLabel(en)}</td><td data-label=""><div class="rowactions"><button type="button" class="mini soft" onclick="openEdit('install',${x.id})">Editar</button><button type="button" class="mini" onclick="delInstall(${x.id})">Excluir</button></div></td></tr>`}).join('')||'<tr><td colspan="5" class="empty">Nenhum parcelamento.</td></tr>';
  const c=data.cards[key(y,m)]||{visa:0,master:0};$('visa').value=c.visa||0;$('master').value=c.master||0;
  // selects de categoria dos formulários
  [['eCat','eName'],['oCat','oName'],['iCat','iName']].forEach(([s,n])=>{const el=$(s),v=el.value;el.innerHTML=catOptions(v);if(!el.dataset.touched){el.value=suggestCat($(n).value)||'outros'}else if(v)el.value=v});
@@ -566,12 +601,12 @@ function consolidate(seqs){
  const M=seqs.map(summary),T={months:M,n:M.length};
  ['income','expenses','fixed','install','cards','oneoff','paid','open','balance'].forEach(k=>T[k]=sum(M,x=>x[k]));
  T.ratio=T.income>0?T.expenses/T.income*100:null;
- const byCat={};M.forEach(m=>m.p.filter(x=>x.type!=='income').forEach(x=>{const{cat}=catOf(x);const b=byCat[cat.id]=byCat[cat.id]||{cat,total:0,items:{},months:new Set()};b.total=r2(b.total+x.value);b.months.add(m.s);const nm=x.type==='install'?x.ref.name:x.name;b.items[nm]=r2((b.items[nm]||0)+x.value)}));
+ const byCat={};M.forEach(m=>m.p.filter(x=>x.type!=='income').forEach(x=>{const{cat}=catOf(x);const b=byCat[cat.id]=byCat[cat.id]||{cat,total:0,items:{},months:new Set(),entries:[]};b.total=r2(b.total+x.value);b.months.add(m.s);b.entries.push({s:m.s,x});const nm=x.type==='install'?x.ref.name:x.name;b.items[nm]=r2((b.items[nm]||0)+x.value)}));
  T.byCat=Object.values(byCat).sort((a,b)=>b.total-a.total);
  return T;
 }
 function renderDashboard(){
- fillPeriods();
+ fillPeriods();$('incBasis').value=data.settings.incomeBasis;$('satBD').checked=data.settings.satBD!==false;
  const seqs=periodSeqs();
  $('periodInfo').textContent=seqs.length?`${seqs.length} mês(es): ${seqLabel(seqs[0])} a ${seqLabel(seqs[seqs.length-1])}`:'';
  $('dashEmpty').style.display=seqs.length?'none':'block';$('dashBody').style.display=seqs.length?'block':'none';
@@ -622,15 +657,17 @@ function renderDonut(T){
  <text x="100" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#172033">${esc(center[1])}</text>
  <text x="100" y="124" text-anchor="middle" font-size="10.5" fill="#697386">${esc(center[2])}</text></svg>
  <div class="legend">${items.map(c=>`<button type="button" data-k="${esc(c.k)}" class="${sel===c.k?'sel':''}"><span style="display:flex;align-items:center"><span class="dot" style="background:${c.color}"></span>${esc(c.label)}</span><span style="text-align:right;white-space:nowrap"><b>${money(c.v)}</b><br><small class="muted">${pctFmt(c.v/total*100)}</small></span></button>`).join('')}</div></div>
- <div class="detail">${si?`<b>${esc(si.label)}:</b> ${money(si.v)} — ${pctFmt(si.v/total*100)} das despesas${T.income>0?` e ${pctFmt(si.v/T.income*100)} da renda`:''} · média ${money(si.v/T.n)}/mês.`:'Toque em uma fatia para ver o valor e a participação.'}</div>`;
- el.querySelectorAll('[data-k]').forEach(n=>n.onclick=()=>{state.donutSel=state.donutSel===n.dataset.k?null:n.dataset.k;renderDonut(T)});
+ <div class="detail">${si?`<b>${esc(si.label)}:</b> ${money(si.v)} — ${pctFmt(si.v/total*100)} das despesas${T.income>0?` e ${pctFmt(si.v/T.income*100)} da renda`:''} · média ${money(si.v/T.n)}/mês.`:'Toque em uma fatia para ver o valor e a participação.'}${si&&state.donutMode==='cat'?' Os lançamentos aparecem em "Ranking de categorias".':''}</div>`;
+ el.querySelectorAll('[data-k]').forEach(n=>n.onclick=()=>{state.donutSel=state.donutSel===n.dataset.k?null:n.dataset.k;renderDonut(T);
+  if(state.donutMode==='cat'){state.rankSel=state.donutSel;state.scrollDetail=!!state.donutSel;renderRank(T)}});
 }
 function renderRank(T){
  const max=T.byCat.length?T.byCat[0].total:1;
  $('catRank').innerHTML=T.byCat.map(c=>`<button type="button" data-c="${esc(c.cat.id)}" class="${state.rankSel===c.cat.id?'sel':''}"><div class="row"><span><span class="dot" style="background:${c.cat.color}"></span>${esc(c.cat.name)}</span><b>${money(c.total)}</b></div><div class="row muted" style="font-size:12px;margin-top:2px"><span>${pctFmt(c.total/T.expenses*100)} das despesas</span><span>média ${money(c.total/T.n)}/mês</span></div><div class="bar"><div style="width:${c.total/max*100}%;background:${c.cat.color}"></div></div></button>`).join('')||'<p class="muted">Sem despesas no período.</p>';
- $('catRank').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{state.rankSel=state.rankSel===b.dataset.c?null:b.dataset.c;renderRank(T)});
+ $('catRank').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{state.rankSel=state.rankSel===b.dataset.c?null:b.dataset.c;state.scrollDetail=true;renderRank(T)});
  const c=T.byCat.find(x=>x.cat.id===state.rankSel);
- $('catDetail').innerHTML=c?`<b>${esc(c.cat.name)}</b> — ${money(c.total)} em ${c.months.size} mês(es):<br>`+Object.entries(c.items).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([n,v])=>`• ${esc(n)}: ${money(v)}`).join('<br>')+(c.cat.id!=='cartao'?`<br><a href="#" onclick="showTab('cat');return false">Reclassificar lançamentos →</a>`:''):'Toque em uma categoria para ver os lançamentos que a compõem.';
+ $('catDetail').innerHTML=c?entriesHTML(c.cat,c.entries,true):'Toque em uma categoria para ver os lançamentos que a compõem.';
+ if(c&&state.scrollDetail){state.scrollDetail=false;$('catDetail').scrollIntoView({behavior:'smooth',block:'start'})}
 }
 function renderEvo(T){
  const list=T.months,n=list.length,W=Math.max(360,n*58),H=250,pl=52,pr=8,pt=12,pb=30;
@@ -667,6 +704,18 @@ function renderSavings(T){
  $('savings').innerHTML=L.map(([t,d])=>`<li><b>${esc(t)}</b><span>${esc(d)}</span></li>`).join('');
 }
 
+/* Lista de lançamentos de uma categoria, agrupada por mês */
+const TYPE_LABEL={fixed:'Fixa',install:'Parcela',card:'Cartão',oneoff:'Avulsa'};
+function entriesHTML(cat,entries,withLink){
+ if(!entries.length)return `<b>${esc(cat.name)}</b>: nenhum lançamento.`;
+ const g={};entries.forEach(e=>(g[e.s]=g[e.s]||[]).push(e));
+ const total=sum(entries,e=>e.x.value),paid=sum(entries.filter(e=>isPaid(e.s,e.x.id)),e=>e.x.value);
+ return `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline"><b><span class="dot" style="background:${cat.color}"></span>${esc(cat.name)}</b><span><b>${money(total)}</b> <small class="muted">· ${entries.length} lançamento(s) · pago ${money(paid)}</small></span></div>
+ <div style="max-height:420px;overflow:auto;margin-top:6px">`+Object.keys(g).map(Number).sort((a,b)=>b-a).map(s=>{const it=g[s].sort((a,b)=>a.x.day-b.x.day);
+  return `<div style="margin-top:8px"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:3px"><a href="#" onclick="goMonth(${s});return false">${seqLabel(s)} →</a><span>${money(sum(it,e=>e.x.value))}</span></div>`+
+  it.map(({x})=>{const pd=isPaid(s,x.id);return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)"><span>${esc(x.name)}<small class="muted" style="display:block">dia ${x.day} · ${TYPE_LABEL[x.type]}${catOf(x).sug?' · categoria sugerida':''}</small></span><span style="text-align:right;white-space:nowrap"><b>${money(x.value)}</b><br><span class="status ${pd?'paid':''}" style="font-size:11px;padding:2px 7px">${pd?'Pago':'Pendente'}</span> <button type="button" class="mini" style="min-height:26px;padding:2px 7px" onclick="openItem(${s},'${x.id}')">Editar</button></span></div>`}).join('')+'</div>'}).join('')+'</div>'+
+ (withLink&&cat.id!=='cartao'?`<div style="margin-top:8px"><a href="#" onclick="showTab('cat');return false">Reclassificar lançamentos →</a></div>`:'');
+}
 /* ---------- Categorias ---------- */
 function allRecords(){const R=[];
  data.fixed.forEach(x=>R.push({t:'fixed',tl:'Fixa',x,sub:`dia ${x.day} · ${money(x.value)}/mês`}));
@@ -675,11 +724,15 @@ function allRecords(){const R=[];
  return R}
 function renderCategories(){
  const used={};allRecords().forEach(r=>{const c=catOfRec(r.x).cat.id;used[c]=(used[c]||0)+1});
- $('catChips').innerHTML=cats().map(c=>`<span class="chip"><span class="dot" style="background:${c.color};margin:0"></span>${esc(c.name)} <small class="muted">${used[c.id]||0}</small><button type="button" class="mini" onclick="renameCat('${esc(c.id)}')" aria-label="Renomear">✎</button>${c.id==='outros'?'':`<button type="button" class="mini" onclick="delCat('${esc(c.id)}')" aria-label="Excluir">×</button>`}</span>`).join('')+`<span class="chip"><span class="dot" style="background:${CARD_CAT.color};margin:0"></span>${CARD_CAT.name} <small class="muted">automática</small></span>`;
+ $('catChips').innerHTML=cats().map(c=>`<span class="chip${state.chipSel===c.id?' sel':''}"><button type="button" class="chipname" data-chip="${esc(c.id)}"><span class="dot" style="background:${c.color};margin:0 4px 0 0"></span>${esc(c.name)} <small class="muted">${used[c.id]||0}</small></button><button type="button" class="mini" onclick="renameCat('${esc(c.id)}')" aria-label="Renomear">✎</button>${c.id==='outros'?'':`<button type="button" class="mini" onclick="delCat('${esc(c.id)}')" aria-label="Excluir">×</button>`}</span>`).join('')+`<span class="chip${state.chipSel==='cartao'?' sel':''}"><button type="button" class="chipname" data-chip="cartao"><span class="dot" style="background:${CARD_CAT.color};margin:0 4px 0 0"></span>${CARD_CAT.name} <small class="muted">automática</small></button></span>`;
+ $('catChips').querySelectorAll('[data-chip]').forEach(b=>b.onclick=()=>{state.chipSel=state.chipSel===b.dataset.chip?null:b.dataset.chip;renderCategories();if(state.chipSel)$('chipDetail').scrollIntoView({behavior:'smooth',block:'start'})});
+ const cs=state.chipSel&&catById(state.chipSel);
+ if(cs){const T=consolidate(recordSeqs()),c=T.byCat.find(x=>x.cat.id===cs.id);$('chipDetail').style.display='block';$('chipDetail').innerHTML=entriesHTML(cs,c?c.entries:[],false)+'<p class="note" style="margin-bottom:0">Considera todos os meses com registros até o mês atual.</p>'}
+ else $('chipDetail').style.display='none';
  const f=$('clsFilter').value,recs=allRecords().filter(r=>f==='all'?true:f==='pending'?!(r.x.cat&&catById(r.x.cat)):r.t===f);
  const pendN=allRecords().filter(r=>!(r.x.cat&&catById(r.x.cat))).length;$('clsBadge').textContent=pendN?`${pendN} não confirmado(s)`:'tudo classificado';$('clsBadge').className='badge '+(pendN?'b-warn':'b-ok');
  $('clsList').innerHTML=recs.map(r=>{const{cat,sug}=catOfRec(r.x);return `<div class="clsrow"><div><b>${esc(r.x.name)}</b> <span class="tag t-cur">${esc(r.tl)}</span><small class="muted" style="display:block">${esc(r.sub)}${sug?' · sugestão automática':''}</small></div>
- <select data-t="${r.t}" data-id="${r.x.id}" style="${sug?'border-style:dashed':''}">${catOptions(cat.id)}</select></div>`}).join('')||'<p class="empty">Nada para classificar aqui. ✅</p>';
+ <div style="display:flex;gap:6px"><select data-t="${r.t}" data-id="${r.x.id}" style="${sug?'border-style:dashed':''}">${catOptions(cat.id)}</select><button type="button" class="mini" onclick="openEdit('${r.t}',${r.x.id}${r.t==='oneoff'?','+keySeq(r.x.monthKey):''})">Editar</button></div></div>`}).join('')||'<p class="empty">Nada para classificar aqui. ✅</p>';
  $('clsList').querySelectorAll('select').forEach(s=>s.onchange=()=>{setCat(s.dataset.t,+s.dataset.id,s.value)});
 }
 function recList(t){return t==='fixed'?data.fixed:t==='install'?data.installments:data.oneOffs}
@@ -785,9 +838,10 @@ function delOneOff(id){if(confirm('Excluir esta despesa avulsa?')){data.oneOffs=
 function toggleIncomeForm(){const f=$('incomeForm');f.style.display=f.style.display==='none'?'grid':'none'}
 $('incomeForm').onsubmit=guard(()=>{const name=txt('rName','a descrição da receita'),day=num('rDay',{min:1,max:31,int:true,label:'Dia'}),value=num('rValue',{min:0.01,label:'Valor'});
  const rec={id:data.nextId++,name,day,value,monthKey:key(+$('year').value,+$('month').value)};if($('rRecurring').checked)rec.recurring=true;
- data.incomes.push(rec);$('incomeForm').reset();$('rDay').value=5;$('incomeForm').style.display='none';save();toast(rec.recurring?'Receita recorrente salva.':'Receita salva no mês.')});
+ if($('rBD5').checked){rec.bd5=true;rec.day=businessDay(keySeq(rec.monthKey))}if($('rRef').value!=='')rec.refOffset=+$('rRef').value;
+ data.incomes.push(rec);$('incomeForm').reset();$('rDay').value=5;$('rBD5info').textContent='';$('satBD').checked=data.settings.satBD!==false;$('incomeForm').style.display='none';save();toast(rec.recurring?'Receita recorrente salva.':'Receita salva no mês.')});
 function delIncome(id){if(confirm('Excluir esta receita?')){data.incomes=data.incomes.filter(x=>x.id!==id);save();toast('Receita excluída.')}}
-function endIncome(id){const r=data.incomes.find(x=>x.id===id);if(!r)return;const s=ym().seq,st=keySeq(r.monthKey);
+function endIncome(id,sCtx){const r=data.incomes.find(x=>x.id===id);if(!r)return;const s=(sCtx??ym().seq)-incOff(r),st=keySeq(r.monthKey);
  if(s<=st){if(confirm(`Excluir a receita recorrente "${r.name}" de todos os meses?`)){data.incomes=data.incomes.filter(x=>x.id!==id);save();toast('Receita excluída.')}return}
  if(confirm(`Encerrar a receita recorrente "${r.name}" a partir de ${seqLabel(s)}?\nOs meses anteriores serão mantidos.`)){r.endKey=seqKey(s-1);save();toast('Receita recorrente encerrada.')}}
 function mark(id){const{y,m}=ym(),k=key(y,m)+'_'+id;if(data.paid[k])delete data.paid[k];else data.paid[k]={date:new Date().toLocaleDateString('pt-BR')};save()}
@@ -796,6 +850,7 @@ function payMonth(s){const it=paymentsFor(s).filter(x=>x.type!=='income'&&!isPai
  if(!confirm(`Marcar como pagos os ${it.length} itens em aberto de ${seqLabel(s)} (${money(sum(it,x=>x.value))})?`))return;
  const d=new Date().toLocaleDateString('pt-BR');it.forEach(x=>data.paid[seqKey(s)+'_'+x.id]={date:d,late:s<todaySeq});save();toast(`${seqLabel(s)}: itens marcados como pagos.`)}
 function payAllMonth(){payMonth(ym().seq)}
+$('ctrlStart').onchange=()=>{const v=$('ctrlStart').value;data.settings.startKey=v||null;if(v&&data.settings.pendingStart&&keySeq(data.settings.pendingStart)<keySeq(v))data.settings.pendingStart=v;save();toast(v?`Controle a partir de ${seqLabel(keySeq(v))}.`:'Considerando todos os meses.')};
 $('pendStart').onchange=()=>{data.settings.pendingStart=$('pendStart').value;save();toast('Início do controle de pendências atualizado.')};
 let editing=null;
 $('expenseForm').onsubmit=guard(()=>{const name=txt('eName','a descrição'),day=num('eDay',{min:1,max:31,int:true,label:'Dia de vencimento'}),value=num('eValue',{min:0,label:'Valor mensal'});
@@ -824,6 +879,70 @@ $('reserveForm').onsubmit=guard(()=>{data.reserve={goal:num('resGoal',{min:0,lab
 ['simTarget','simMode','simValue'].forEach(id=>$(id).addEventListener('input',runSim));$('simForm').onsubmit=e=>{e.preventDefault();runSim()};
 $('period').onchange=()=>{state.evoSel=null;state.donutSel=null;state.rankSel=null;renderDashboard()};
 document.querySelectorAll('[data-dmode]').forEach(b=>b.onclick=()=>{state.donutMode=b.dataset.dmode;state.donutSel=null;renderDashboard()});
+
+/* ================= EDIÇÃO DE QUALQUER LANÇAMENTO ================= */
+function recOf(kind,id){return kind==='income'?data.incomes.find(x=>x.id===id):kind==='oneoff'?data.oneOffs.find(x=>x.id===id):kind==='fixed'?data.fixed.find(x=>x.id===id):kind==='install'?data.installments.find(x=>x.id===id):null}
+function openItem(s,itemId){if(itemId==='visa'||itemId==='master')return openEdit('card',itemId,s,'month');const k={f:'fixed',i:'install',o:'oneoff',r:'income'}[itemId[0]];openEdit(k,+itemId.slice(1),s,(k==='fixed'||k==='install')?'month':'all')}
+function openEdit(kind,id,s,scope){state.ed={kind,id,s:s??ym().seq,scope:scope||'all'};buildEdit();const d=$('editDlg');if(!d.open)d.showModal()}
+function closeEdit(){const d=$('editDlg');if(d.open)d.close();state.ed=null}
+function monthOpts(sel){const a=Math.min(sel,todaySeq)-24,b=Math.max(sel,todaySeq)+24;let o='';for(let s=a;s<=b;s++)o+=`<option value="${s}"${s===sel?' selected':''}>${seqLabel(s)}</option>`;return o}
+const fIn=(id,label,val,type='text',attrs='',full=false)=>`<label class="${full?'full':''}">${label}<input id="ed_${id}" type="${type}" value="${esc(val)}" ${attrs}></label>`;
+const fNum=(id,label,val,attrs)=>fIn(id,label,val,'number',attrs+' inputmode="decimal"');
+const fCat=sel=>`<label class="full">Categoria<select id="ed_cat">${catOptions(sel)}</select></label>`;
+function buildEdit(){
+ const e=state.ed,k=seqKey(e.s);let html='',title='',del='Excluir',scope='';
+ const it=(e.kind==='fixed'||e.kind==='install')?paymentsFor(e.s).find(x=>x.id===(e.kind==='fixed'?'f':'i')+e.id):null;
+ if(e.kind!=='card'&&!recOf(e.kind,e.id)){closeEdit();return}
+ if((e.kind==='fixed'||e.kind==='install')&&!it)e.scope='all';
+ if(it){scope=`<div class="seg-toggle" style="margin-top:6px"><button type="button" data-scope="month" class="${e.scope==='month'?'active':''}">Só ${seqShort(e.s)}</button><button type="button" data-scope="all" class="${e.scope==='all'?'active':''}">Cadastro (todos os meses)</button></div>
+  <p class="note" style="margin:6px 0 0">${e.scope==='month'?'Ajusta somente este mês (valor/dia). Os outros meses continuam com o cadastro.':'Altera o cadastro: vale para todos os meses, inclusive os anteriores.'}</p>`}
+ if(e.kind==='income'){const r=recOf('income',e.id);title='Editar receita';del=r.recurring?'Encerrar / excluir':'Excluir receita';
+  html=fIn('name','Descrição',r.name,'text','maxlength="80"',true)+fNum('value','Valor (R$)',r.value,'min="0.01" step=".01"')+fNum('day','Dia',r.day,'min="1" max="31" step="1"')+
+  `<label class="full chk"><input id="ed_bd5" type="checkbox"${r.bd5?' checked':''}> Recebo no 5º dia útil (dia calculado a cada mês)</label>
+  <label>${r.recurring?'Recebida a partir de':'Mês do recebimento'}<select id="ed_month">${monthOpts(keySeq(r.monthKey))}</select></label>
+  <label>Referente a<select id="ed_ref"><option value=""${r.refOffset==null?' selected':''}>Não informar</option><option value="-1"${r.refOffset===-1?' selected':''}>Mês anterior</option><option value="0"${r.refOffset===0?' selected':''}>Ao próprio mês</option></select></label>
+  <label class="full chk"><input id="ed_rec" type="checkbox"${r.recurring?' checked':''}> Receita recorrente (repete todo mês)</label>`}
+ else if(e.kind==='oneoff'){const r=recOf('oneoff',e.id);title='Editar despesa avulsa';
+  html=fIn('name','Descrição',r.name,'text','maxlength="80"',true)+fNum('value','Valor (R$)',r.value,'min="0.01" step=".01"')+fNum('day','Dia',r.day,'min="1" max="31" step="1"')+`<label class="full">Mês<select id="ed_month">${monthOpts(keySeq(r.monthKey))}</select></label>`+fCat(catOfRec(r).cat.id)}
+ else if(e.kind==='fixed'){const r=recOf('fixed',e.id);title='Editar despesa fixa';
+  if(e.scope==='month'){title+=` — ${seqLabel(e.s)}`;del='';html=fNum('value','Valor neste mês (R$)',it.value,'min="0" step=".01"')+fNum('day','Dia neste mês',it.day,'min="1" max="31" step="1"')+(it.adjusted?`<div class="full"><button type="button" class="mini soft" onclick="clearOverride('${k}_f${e.id}')">↺ Voltar ao valor do cadastro (${money(r.value)}, dia ${r.day})</button></div>`:'')}
+  else{del='Excluir despesa fixa';html=fIn('name','Descrição',r.name,'text','maxlength="80"',true)+fNum('value','Valor mensal (R$)',r.value,'min="0" step=".01"')+fNum('day','Dia de vencimento',r.day,'min="1" max="31" step="1"')+fCat(catOfRec(r).cat.id)}}
+ else if(e.kind==='install'){const r=recOf('install',e.id);title='Editar parcelamento';
+  if(e.scope==='month'){title+=` — ${esc(it.name)}`;del='';html=fNum('value','Valor desta parcela (R$)',it.value,'min="0" step=".01"')+fNum('day','Dia de vencimento desta parcela',it.day,'min="1" max="31" step="1"')+(it.adjusted?`<div class="full"><button type="button" class="mini soft" onclick="clearOverride('${k}_i${e.id}')">↺ Voltar ao cadastro (${money(r.value)}, dia ${r.day})</button></div>`:'')}
+  else{del='Excluir parcelamento';const st=(+r.year)*12+(+r.month);html=fIn('name','Descrição',r.name,'text','maxlength="80"',true)+fNum('value','Valor da parcela (R$)',r.value,'min="0" step=".01"')+fNum('qty','Quantidade de parcelas',r.qty,'min="1" max="600" step="1"')+fNum('day','Dia de vencimento',r.day,'min="1" max="31" step="1"')+`<label>Mês da 1ª parcela<select id="ed_month">${monthOpts(st)}</select></label>`+fCat(catOfRec(r).cat.id)}}
+ else if(e.kind==='card'){const c=data.cards[k]||{visa:0,master:0},def=e.id==='visa'?8:21,o=data.overrides[k+'_'+e.id];title=`Editar fatura ${e.id==='visa'?'Visa':'Mastercard'} — ${seqLabel(e.s)}`;del='Zerar fatura';
+  html=fNum('value','Valor da fatura (R$)',c[e.id]||0,'min="0" step=".01"')+fNum('day','Dia de vencimento neste mês',(o&&o.day)||def,'min="1" max="31" step="1"')}
+ $('edTitle').innerHTML=title;$('edScope').innerHTML=scope;$('edFields').innerHTML=html;
+ $('edDelete').style.display=del?'inline-flex':'none';$('edDelete').textContent=del;
+ $('edScope').querySelectorAll('[data-scope]').forEach(b=>b.onclick=()=>{state.ed.scope=b.dataset.scope;buildEdit()});
+ const bd=$('ed_bd5');if(bd){const upd=()=>{if(bd.checked)$('ed_day').value=businessDay(+$('ed_month').value)};bd.onchange=upd;$('ed_month').addEventListener('change',upd)}
+}
+function clearOverride(k){delete data.overrides[k];save();buildEdit();toast('Ajuste do mês removido.')}
+$('editForm').onsubmit=guard(()=>{const e=state.ed;if(!e)return;const k=seqKey(e.s),r=recOf(e.kind,e.id);
+ const day=()=>num('ed_day',{min:1,max:31,int:true,label:'Dia'});
+ if(e.kind==='income'){const name=txt('ed_name','a descrição'),value=num('ed_value',{min:0.01,label:'Valor'}),d=day(),mk=seqKey(+$('ed_month').value);
+  Object.assign(r,{name,value,day:d,monthKey:mk});if($('ed_bd5').checked){r.bd5=true;r.day=businessDay(keySeq(mk))}else delete r.bd5;
+  const rv=$('ed_ref').value;if(rv==='')delete r.refOffset;else r.refOffset=+rv;
+  if($('ed_rec').checked)r.recurring=true;else{delete r.recurring;delete r.endKey}}
+ else if(e.kind==='oneoff'){const name=txt('ed_name','a descrição'),value=num('ed_value',{min:0.01,label:'Valor'}),d=day(),nk=seqKey(+$('ed_month').value),ok=r.monthKey;
+  if(nk!==ok&&data.paid[ok+'_o'+r.id]){data.paid[nk+'_o'+r.id]=data.paid[ok+'_o'+r.id];delete data.paid[ok+'_o'+r.id]}
+  Object.assign(r,{name,value,day:d,monthKey:nk,cat:$('ed_cat').value})}
+ else if((e.kind==='fixed'||e.kind==='install')&&e.scope==='month'){const v=num('ed_value',{min:0,label:'Valor'}),d=day(),ok=k+'_'+(e.kind==='fixed'?'f':'i')+r.id;
+  if(v===+r.value&&d===+r.day)delete data.overrides[ok];else data.overrides[ok]={value:v,day:d}}
+ else if(e.kind==='fixed'){Object.assign(r,{name:txt('ed_name','a descrição'),value:num('ed_value',{min:0,label:'Valor mensal'}),day:day(),cat:$('ed_cat').value})}
+ else if(e.kind==='install'){const st=+$('ed_month').value;Object.assign(r,{name:txt('ed_name','a descrição'),value:num('ed_value',{min:0,label:'Valor da parcela'}),qty:num('ed_qty',{min:1,max:600,int:true,label:'Quantidade'}),day:day(),year:Math.floor(st/12),month:st%12,cat:$('ed_cat').value})}
+ else if(e.kind==='card'){const v=num('ed_value',{min:0,label:'Valor da fatura'}),d=day(),def=e.id==='visa'?8:21;data.cards[k]=data.cards[k]||{visa:0,master:0};data.cards[k][e.id]=v;
+  if(d!==def)data.overrides[k+'_'+e.id]={day:d};else delete data.overrides[k+'_'+e.id]}
+ closeEdit();save();toast('Lançamento atualizado.')});
+$('edDelete').onclick=()=>{const e=state.ed;if(!e)return;const before=JSON.stringify(data);
+ if(e.kind==='income'){const r=recOf('income',e.id);r.recurring?endIncome(e.id,e.s):delIncome(e.id)}
+ else if(e.kind==='oneoff')delOneOff(e.id);else if(e.kind==='fixed')delFixed(e.id);else if(e.kind==='install')delInstall(e.id);
+ else if(e.kind==='card'&&confirm('Zerar esta fatura?')){const k=seqKey(e.s);if(data.cards[k]){data.cards[k][e.id]=0;save();toast('Fatura zerada.')}}
+ if(JSON.stringify(data)!==before)closeEdit()};
+$('editDlg').addEventListener('close',()=>{state.ed=null});
+$('incBasis').onchange=()=>{data.settings.incomeBasis=$('incBasis').value;save();toast($('incBasis').value==='ref'?'Receitas pelo mês de referência.':'Receitas pelo mês do recebimento.')};
+$('satBD').onchange=()=>{data.settings.satBD=$('satBD').checked;save()};
+$('rBD5').onchange=()=>{const s=ym().seq;if($('rBD5').checked){const d=businessDay(s);$('rDay').value=d;$('rBD5info').textContent=`(${seqShort(s)}: dia ${d})`}else $('rBD5info').textContent=''};
 
 /* Backup */
 function exportData(){const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a'),d=new Date(),stamp=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
