@@ -77,6 +77,12 @@ main,.panel{max-width:100%}
 .pend{border:1px solid #fecaca;background:#fff7f7}
 .pgroup{border-top:1px solid #fde2e2;padding-top:8px;margin-top:8px}
 .pitem{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 0;border-bottom:1px dashed #f3d3d3}
+.cardbox{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:4px}.cardbox+.cardbox{margin-top:10px}
+.cardbox .cbhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.cardbox .cbnums{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-top:6px}.cardbox .cbnums b{display:block;font-size:15px}
+.cardbox .cbpay{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:13px;padding:5px 0;border-bottom:1px dashed var(--line)}
+.status.part{background:#fef3c7;color:#92400e}.cbwarn{color:#b45309;font-size:12px;margin-top:6px}
+.carry{background:#fff7ed;border:1px dashed #fdba74;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:13px}
 .neg{color:var(--red)}.pos{color:var(--green)}
 .catlist{display:flex;flex-wrap:wrap;gap:8px}.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:20px;padding:5px 6px 5px 10px;background:white;font-size:13px}
 .chip button{min-height:28px;padding:3px 8px;font-size:12px}.chip .chipname{border:0;background:transparent;font-size:13px;font-weight:500;padding:3px 4px;display:inline-flex;align-items:center;gap:3px}.chip.sel{border-color:var(--primary);background:#eef2ff}
@@ -288,12 +294,15 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
 </form>
 <div style="overflow-x:auto"><table class="rtable"><thead><tr><th>Descrição</th><th>Parcela</th><th>Qtd.</th><th>Período</th><th></th></tr></thead><tbody id="installList"></tbody></table></div>
 </div>
-<div class="panel section"><h2>Cartões de crédito</h2><p class="muted">Informe as faturas do mês selecionado. Visa vence dia 8 e Mastercard dia 21.</p>
+<div class="panel section"><h2>Cartões de crédito</h2><p class="muted">Informe a fatura e o valor mínimo do mês selecionado. A fatura fica <b>em aberto</b> até os pagamentos lançados somarem o valor total; o que faltar vai para o mês seguinte como pendência. Visa vence dia 8 e Mastercard dia 21.</p>
 <form id="cardForm" class="formgrid" novalidate>
-<label>Visa (R$)<input id="visa" type="number" min="0" step=".01" inputmode="decimal"></label>
-<label>Mastercard (R$)<input id="master" type="number" min="0" step=".01" inputmode="decimal"></label>
+<label>Visa — valor da fatura (R$)<input id="visa" type="number" min="0" step=".01" inputmode="decimal"></label>
+<label>Visa — valor mínimo (R$)<input id="visaMin" type="number" min="0" step=".01" inputmode="decimal"></label>
+<label>Mastercard — valor da fatura (R$)<input id="master" type="number" min="0" step=".01" inputmode="decimal"></label>
+<label>Mastercard — valor mínimo (R$)<input id="masterMin" type="number" min="0" step=".01" inputmode="decimal"></label>
 <div class="full"><button class="primary" type="submit">Salvar faturas</button></div>
 </form>
+<div id="cardStatus" class="section"></div>
 </div>
 <div class="panel section mobileonly"><h2>Backup</h2>
 <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" type="button" onclick="exportData()">Exportar backup</button><button type="button" onclick="$('importFile').click()">Importar backup</button></div>
@@ -310,7 +319,7 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
 <input id="catName" maxlength="40" placeholder="Nova categoria (ex.: Pets)" style="flex:1;min-width:180px">
 <button class="primary" type="submit">＋ Adicionar</button>
 </form>
-<p class="note">As faturas de cartão entram como <b>Cartão de crédito</b>, porque são um valor único. Para detalhar o que foi gasto no cartão, use uma categoria própria nas despesas avulsas — mas sem lançar a mesma compra duas vezes.</p>
+<p class="note">As faturas de cartão entram como <b>Cartão de crédito</b>, porque são um valor único (os pagamentos lançados dentro da fatura só reduzem o saldo em aberto). Para detalhar o que foi gasto no cartão, use uma categoria própria nas despesas avulsas — mas sem lançar a mesma compra duas vezes.</p>
 </div>
 <div class="panel section"><h2>Classificar lançamentos <span class="badge b-warn" id="clsBadge"></span></h2>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
@@ -501,24 +510,46 @@ function businessDay(s,n=5){const y=Math.floor(s/12),m=s%12,H=holidays(y),sat=da
 const incOff=x=>data.settings.incomeBasis==='ref'?(+x.refOffset||0):0;
 function incomesFor(s){return data.incomes.filter(x=>{const r=s-incOff(x);if(x.recurring){const st=keySeq(x.monthKey);return r>=st&&(!x.endKey||r<=keySeq(x.endKey))}return x.monthKey===seqKey(r)})}
 const startSeq=()=>data.settings.startKey?keySeq(data.settings.startKey):-Infinity;
+/* ---------- Cartões: fatura, mínimo e pagamentos lançados ---------- */
+const CARD_DEF={visa:{name:'Visa',day:8},master:{name:'Mastercard',day:21}};
+const isCardId=id=>id==='visa'||id==='master';
+const isoToday=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const fmtD=d=>/^\d{4}-\d{2}-\d{2}$/.test(String(d||''))?String(d).split('-').reverse().join('/'):String(d||'');
+function cardRec(k){return data.cards[k]||{visa:0,master:0}}
+function cardObj(k){const c=data.cards[k]=data.cards[k]||{visa:0,master:0};['pays','min','roll'].forEach(f=>{if(!c[f]||typeof c[f]!=='object'||Array.isArray(c[f]))c[f]={}});return c}
+function cardMin(k,id){const c=data.cards[k];return +(c&&c.min&&c.min[id])||0}
+function cardPays(k,id){const c=data.cards[k];return c&&c.pays&&Array.isArray(c.pays[id])?c.pays[id]:[]}
+/* Pago = soma dos lançamentos. Compatibilidade: marcação antiga "Pago" (sem lançamentos) vale como pagamento integral */
+function cardPaidAmt(k,id,value){const p=cardPays(k,id);if(p.length)return sum(p,x=>x.value);return data.paid[k+'_'+id]?(+value||0):0}
+function cardRemainder(s,id){const k=seqKey(s),v=+cardRec(k)[id]||0;if(!v||s<startSeq())return 0;return r2(Math.max(0,v-cardPaidAmt(k,id,v)))}
+/* Saldo não pago do mês s já incluído (refinanciado) na fatura do mês seguinte? */
+function cardAbsorbed(s,id){const c=data.cards[seqKey(s+1)];return !!(c&&c.roll&&c.roll[id])}
+function addCardPay(k,id,value,date){const c=cardObj(k);if(!Array.isArray(c.pays[id]))c.pays[id]=[];
+ const leg=data.paid[k+'_'+id];if(leg&&!c.pays[id].length)c.pays[id].push({id:data.nextId++,date:leg.date||'',value:r2(+c[id]||0)});
+ delete data.paid[k+'_'+id];c.pays[id].push({id:data.nextId++,date:date||isoToday(),value:r2(value)})}
+function delCardPay(k,id,pid){if(!confirm('Excluir este pagamento?'))return;
+ if(pid==='legacy')delete data.paid[k+'_'+id];else{const c=cardObj(k);c.pays[id]=(c.pays[id]||[]).filter(x=>x.id!==pid)}
+ save();if(state.ed)buildEdit();toast('Pagamento excluído.')}
+function toggleRoll(k,id,on){const c=cardObj(k);if(on)c.roll[id]=true;else delete c.roll[id];save();toast(on?'Saldo anterior considerado dentro desta fatura.':'Saldo anterior voltou a ser pendência.')}
+function paidValue(s,x){if(x.type==='card')return Math.min(+x.paidAmt||0,x.value);return isPaid(s,x.id)?x.value:0}
+function openCardPay(s,id){openEdit('card',id,s,'month');state.ed.pay=true;buildEdit();setTimeout(()=>{const el=$('ed_pv');if(el){el.focus();el.select()}},50)}
 function paymentsFor(s){
  const k=seqKey(s),arr=[];if(s<startSeq())return arr; // antes do início do controle: nada é considerado
  data.fixed.forEach(x=>arr.push({id:'f'+x.id,type:'fixed',name:x.name,day:x.day,value:+x.value||0,ref:x}));
  data.installments.forEach(x=>{const st=(+x.year)*12+(+x.month),en=st+(+x.qty)-1;if(s>=st&&s<=en)arr.push({id:'i'+x.id,type:'install',name:x.name+` (${s-st+1}/${x.qty})`,day:x.day,value:+x.value||0,ref:x,remaining:en-s+1,end:en})});
  const c=data.cards[k]||{visa:0,master:0};
- if(+c.visa)arr.push({id:'visa',type:'card',name:'Fatura Visa',day:8,value:+c.visa});
- if(+c.master)arr.push({id:'master',type:'card',name:'Fatura Mastercard',day:21,value:+c.master});
+ ['visa','master'].forEach(id=>{const v=+c[id]||0;if(v)arr.push({id,type:'card',name:'Fatura '+CARD_DEF[id].name,day:CARD_DEF[id].day,value:v,min:cardMin(k,id),paidAmt:r2(cardPaidAmt(k,id,v))})});
  arr.forEach(x=>{const o=data.overrides[k+'_'+x.id];if(o){if(o.value!=null&&isFinite(o.value))x.value=+o.value;if(o.day)x.day=+o.day;x.adjusted=true}});
  data.oneOffs.filter(x=>x.monthKey===k).forEach(x=>arr.push({id:'o'+x.id,type:'oneoff',name:x.name,day:x.day,value:+x.value||0,ref:x}));
  incomesFor(s).forEach(x=>{const r=s-incOff(x);arr.push({id:'r'+x.id,type:'income',name:'↗ '+x.name+(x.recurring?' (recorrente)':''),day:x.bd5?businessDay(r):x.day,value:+x.value||0,ref:x,recv:r})});
  return arr.sort((a,b)=>a.day-b.day||a.name.localeCompare(b.name));
 }
 function getPayments(){return paymentsFor(ym().seq)}
-const isPaid=(s,id)=>!!data.paid[seqKey(s)+'_'+id];
+function isPaid(s,id){if(isCardId(id)){const k=seqKey(s),v=+cardRec(k)[id]||0;return v>0&&cardPaidAmt(k,id,v)>=v-0.005}return !!data.paid[seqKey(s)+'_'+id]}
 function summary(s){
  const p=paymentsFor(s),by=t=>sum(p.filter(x=>x.type===t),x=>x.value);
  const income=by('income'),fixed=by('fixed'),install=by('install'),cards=by('card'),oneoff=by('oneoff'),expenses=r2(fixed+install+cards+oneoff);
- const exp=p.filter(x=>x.type!=='income'),paid=sum(exp.filter(x=>isPaid(s,x.id)),x=>x.value);
+ const exp=p.filter(x=>x.type!=='income'),paid=sum(exp,x=>paidValue(s,x));
  return{s,p,income,fixed,install,cards,oneoff,expenses,paid,open:r2(expenses-paid),balance:r2(income-expenses),hasCards:!!data.cards[seqKey(s)],ratio:income>0?expenses/income*100:null,installItems:p.filter(x=>x.type==='install')};
 }
 function suggestedReserve(sm){if(sm.income<=0||sm.balance<=0)return 0;return r2(Math.min(sm.income*data.reserve.percent/100,sm.balance))}
@@ -544,7 +575,10 @@ function recordSeqs(){
 function defaultPendStart(){const st=startSeq(),c=[...recordSeqs(),...data.installments.map(x=>(+x.year)*12+(+x.month)).filter(s=>s<=todaySeq&&s>=st)];return c.length?Math.min(...c):Math.max(todaySeq,st===-Infinity?todaySeq:st)}
 function pendingStartSeq(){const st=startSeq(),p=data.settings.pendingStart?keySeq(data.settings.pendingStart):defaultPendStart();return Math.max(p,st===-Infinity?p:st)}
 function pendingBefore(M){const out=[],st=pendingStartSeq(),en=Math.min(M-1,todaySeq);
- for(let s=st;s<=en;s++)paymentsFor(s).forEach(x=>{if(x.type!=='income'&&!isPaid(s,x.id))out.push({s,x})});return out}
+ for(let s=st;s<=en;s++)paymentsFor(s).forEach(x=>{if(x.type==='income')return;
+  if(x.type==='card'){const rem=r2(x.value-paidValue(s,x));if(rem<=0.005||cardAbsorbed(s,x.id))return;
+   out.push({s,x:{...x,value:rem,full:x.value,name:x.name+' — saldo não pago'+(x.paidAmt>0?` (fatura ${money(x.value)}, pago ${money(x.paidAmt)})`:'')}});return}
+  if(!isPaid(s,x.id))out.push({s,x})});return out}
 
 /* ================= RENDER ================= */
 function render(){
@@ -577,16 +611,33 @@ function renderLanc(cur){
  $('calendar').innerHTML=p.map(x=>{
   if(x.type==='income'){const rec=x.ref,tags=[];if(rec.bd5)tags.push('5º dia útil');if(rec.refOffset!=null&&rec.refOffset!=='')tags.push('ref. '+seqShort(x.recv+(+rec.refOffset)));if(x.recv!==seq)tags.push('recebida em '+seqShort(x.recv));
    return `<tr><td data-label="Dia">${x.day}</td><td data-label="Descrição" class="title" style="color:var(--green)"><span>${esc(x.name)}${tags.length?`<br><span class="tagline">${tags.map(t=>`<span class="ctag">${esc(t)}</span>`).join('')}</span>`:''}</span></td><td data-label="Valor" style="color:var(--green)">+ ${money(x.value)}</td><td data-label="Status"><span class="status paid">Receita</span></td><td data-label=""><button type="button" class="mini soft" onclick="openItem(${seq},'${x.id}')">Editar</button></td></tr>`}
+  if(x.type==='card'){const pa=paidValue(seq,x),rem=r2(x.value-pa),full=rem<=0.005,low=!full&&x.min>0&&x.paidAmt<x.min-0.005;
+   const st=full?`<span class="status paid">Pago${x.paidAmt>x.value+0.005?' · a maior '+money(x.paidAmt-x.value):''}</span>`:pa>0?`<span class="status part">Parcial · resta ${money(rem)}</span>`:`<span class="status">Em aberto</span>`;
+   const sub=`<small style="display:block" class="muted">${x.min?'mín. '+money(x.min)+' · ':''}pago ${money(x.paidAmt)}</small>${low?'<small style="display:block;color:#b45309">abaixo do mínimo</small>':''}`;
+   return `<tr><td data-label="Dia">${x.day}</td><td data-label="Descrição" class="title"><span>${esc(x.name)}<br><span class="tagline">${ctag(x)}${x.adjusted?'<span class="ctag" style="background:#fef3c7">ajustado neste mês</span>':''}</span></span></td><td data-label="Valor">${money(x.value)}</td><td data-label="Status"><span>${st}${sub}</span></td><td data-label=""><div class="rowactions">${full?'':`<button type="button" class="mini soft" onclick="openCardPay(${seq},'${x.id}')">Pagar</button>`}<button type="button" class="mini" onclick="openItem(${seq},'${x.id}')">${full?'Pagamentos':'Editar'}</button></div></td></tr>`}
   const paid=data.paid[key(y,m)+'_'+x.id];
   return `<tr><td data-label="Dia">${x.day}</td><td data-label="Descrição" class="title"><span>${esc(x.name)}<br><span class="tagline">${ctag(x)}${x.adjusted?'<span class="ctag" style="background:#fef3c7">ajustado neste mês</span>':''}</span></span></td><td data-label="Valor">${money(x.value)}</td><td data-label="Status"><span class="status ${paid?'paid':''}">${paid?'Pago':'Pendente'}${paid&&paid.date?' · '+esc(paid.date):''}</span></td><td data-label=""><div class="rowactions"><button type="button" class="mini ${paid?'':'soft'}" onclick="mark('${x.id}')">${paid?'Desfazer':'Pagar'}</button><button type="button" class="mini" onclick="openItem(${seq},'${x.id}')">Editar</button></div></td></tr>`}).join('')||'<tr><td colspan="5" class="empty">Nenhum pagamento neste mês.</td></tr>';
  $('fixedList').innerHTML=data.fixed.map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center"><span>${esc(x.name)}<small class="muted"> dia ${x.day} · ${money(x.value)}</small><br>${ctag({type:'fixed',ref:x})}</span><span style="white-space:nowrap"><button type="button" class="mini" onclick="openEdit('fixed',${x.id})">Editar</button> <button type="button" class="mini" onclick="delFixed(${x.id})" aria-label="Excluir">×</button></span></div>`).join('')||'<p class="muted">Nenhuma despesa fixa cadastrada.</p>';
  $('oneOffList').innerHTML=data.oneOffs.filter(x=>x.monthKey===key(y,m)).map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center"><span>${esc(x.name)}<small class="muted"> dia ${x.day} · ${money(x.value)}</small><br>${ctag({type:'oneoff',ref:x})}</span><span style="white-space:nowrap"><button type="button" class="mini soft" onclick="openEdit('oneoff',${x.id},${seq})">Editar</button> <button type="button" class="mini" onclick="delOneOff(${x.id})">Excluir</button></span></div>`).join('')||'<p class="muted">Nenhuma despesa avulsa lançada neste mês.</p>';
  $('installList').innerHTML=data.installments.map(x=>{const st=(+x.year)*12+(+x.month),en=st+(+x.qty)-1;
   return `<tr${editingInstall===x.id?' style="background:#fef9c3"':''}><td data-label="Descrição" class="title"><span>${esc(x.name)}<br>${ctag({type:'install',ref:x})}</span></td><td data-label="Parcela">${money(x.value)}<small>dia ${x.day}</small></td><td data-label="Qtd.">${x.qty}</td><td data-label="Período">${seqLabel(st)} até ${seqLabel(en)}</td><td data-label=""><div class="rowactions"><button type="button" class="mini soft" onclick="openEdit('install',${x.id})">Editar</button><button type="button" class="mini" onclick="delInstall(${x.id})">Excluir</button></div></td></tr>`}).join('')||'<tr><td colspan="5" class="empty">Nenhum parcelamento.</td></tr>';
- const c=data.cards[key(y,m)]||{visa:0,master:0};$('visa').value=c.visa||0;$('master').value=c.master||0;
+ const ck=key(y,m),c=cardRec(ck);$('visa').value=c.visa||0;$('master').value=c.master||0;$('visaMin').value=cardMin(ck,'visa')||0;$('masterMin').value=cardMin(ck,'master')||0;
+ $('cardStatus').innerHTML=seq<startSeq()?'':['visa','master'].map(id=>cardBox(seq,id)).join('');
  // selects de categoria dos formulários
  [['eCat','eName'],['oCat','oName'],['iCat','iName']].forEach(([s,n])=>{const el=$(s),v=el.value;el.innerHTML=catOptions(v);if(!el.dataset.touched){el.value=suggestCat($(n).value)||'outros'}else if(v)el.value=v});
 }
+
+function cardBox(s,id){const k=seqKey(s),v=+cardRec(k)[id]||0,min=cardMin(k,id),pays=cardPays(k,id),leg=!pays.length&&data.paid[k+'_'+id],pd=r2(cardPaidAmt(k,id,v)),rem=r2(Math.max(0,v-pd)),D=CARD_DEF[id];
+ const prev=cardRemainder(s-1,id),absorbed=!!(cardRec(k).roll&&cardRec(k).roll[id]);
+ const st=!v?'<span class="status" style="background:#f1f5f9;color:#475569">Sem fatura</span>':rem<=0.005?'<span class="status paid">Pago</span>':pd>0?'<span class="status part">Parcial</span>':'<span class="status">Em aberto</span>';
+ const list=pays.map(p=>`<div class="cbpay"><span>${esc(fmtD(p.date))||'—'} · <b>${money(p.value)}</b></span><button type="button" class="mini" onclick="delCardPay('${k}','${id}',${p.id})" aria-label="Excluir pagamento">×</button></div>`).join('')+(leg?`<div class="cbpay"><span>Marcado como pago (valor integral)${leg.date?' · '+esc(leg.date):''}</span><button type="button" class="mini" onclick="delCardPay('${k}','${id}','legacy')">×</button></div>`:'');
+ return `<div class="cardbox"><div class="cbhead"><b>${D.name} <small class="muted">venc. dia ${D.day}</small></b><span>${st} ${v&&rem>0.005?`<button type="button" class="mini soft" onclick="openCardPay(${s},'${id}')">＋ Lançar pagamento</button>`:''}</span></div>
+ <div class="cbnums"><span><small class="muted">Fatura</small><b>${money(v)}</b></span><span><small class="muted">Mínimo</small><b>${money(min)}</b></span><span><small class="muted">Pago</small><b class="pos">${money(pd)}</b></span><span><small class="muted">Em aberto</small><b class="${rem>0.005?'neg':''}">${money(rem)}</b></span></div>
+ ${v&&min>0&&pd<min-0.005&&rem>0.005?`<div class="cbwarn">⚠️ Faltam ${money(min-pd)} para atingir o pagamento mínimo.</div>`:''}
+ ${v&&rem>0.005?`<div class="muted" style="font-size:12px;margin-top:6px">Se não for quitado neste mês, ${money(rem)} vai para ${seqLabel(s+1)} como pendência.</div>`:''}
+ ${list?`<div style="margin-top:6px">${list}</div>`:''}
+ ${prev>0.005?`<div class="carry">Saldo não pago da fatura de <b>${seqLabel(s-1)}</b>: <b>${money(prev)}</b> — ${absorbed?'considerado <b>dentro desta fatura</b>.':'está em <b>Pendências</b> como valor a pagar.'}<label class="chk" style="display:block;margin-top:6px"><input type="checkbox"${absorbed?' checked':''} onchange="toggleRoll('${k}','${id}',this.checked)"> A fatura deste mês já inclui esse saldo (evita contar duas vezes)</label></div>`:''}
+ </div>`}
 
 /* ---------- Painel geral (consolidado) ---------- */
 function fillPeriods(){
@@ -709,7 +760,7 @@ const TYPE_LABEL={fixed:'Fixa',install:'Parcela',card:'Cartão',oneoff:'Avulsa'}
 function entriesHTML(cat,entries,withLink){
  if(!entries.length)return `<b>${esc(cat.name)}</b>: nenhum lançamento.`;
  const g={};entries.forEach(e=>(g[e.s]=g[e.s]||[]).push(e));
- const total=sum(entries,e=>e.x.value),paid=sum(entries.filter(e=>isPaid(e.s,e.x.id)),e=>e.x.value);
+ const total=sum(entries,e=>e.x.value),paid=sum(entries,e=>paidValue(e.s,e.x));
  return `<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline"><b><span class="dot" style="background:${cat.color}"></span>${esc(cat.name)}</b><span><b>${money(total)}</b> <small class="muted">· ${entries.length} lançamento(s) · pago ${money(paid)}</small></span></div>
  <div style="max-height:420px;overflow:auto;margin-top:6px">`+Object.keys(g).map(Number).sort((a,b)=>b-a).map(s=>{const it=g[s].sort((a,b)=>a.x.day-b.x.day);
   return `<div style="margin-top:8px"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:3px"><a href="#" onclick="goMonth(${s});return false">${seqLabel(s)} →</a><span>${money(sum(it,e=>e.x.value))}</span></div>`+
@@ -844,11 +895,12 @@ function delIncome(id){if(confirm('Excluir esta receita?')){data.incomes=data.in
 function endIncome(id,sCtx){const r=data.incomes.find(x=>x.id===id);if(!r)return;const s=(sCtx??ym().seq)-incOff(r),st=keySeq(r.monthKey);
  if(s<=st){if(confirm(`Excluir a receita recorrente "${r.name}" de todos os meses?`)){data.incomes=data.incomes.filter(x=>x.id!==id);save();toast('Receita excluída.')}return}
  if(confirm(`Encerrar a receita recorrente "${r.name}" a partir de ${seqLabel(s)}?\nOs meses anteriores serão mantidos.`)){r.endKey=seqKey(s-1);save();toast('Receita recorrente encerrada.')}}
-function mark(id){const{y,m}=ym(),k=key(y,m)+'_'+id;if(data.paid[k])delete data.paid[k];else data.paid[k]={date:new Date().toLocaleDateString('pt-BR')};save()}
-function payLate(s,id){data.paid[seqKey(s)+'_'+id]={date:new Date().toLocaleDateString('pt-BR'),late:true};save();toast('Pendência paga.')}
-function payMonth(s){const it=paymentsFor(s).filter(x=>x.type!=='income'&&!isPaid(s,x.id));if(!it.length)return;
- if(!confirm(`Marcar como pagos os ${it.length} itens em aberto de ${seqLabel(s)} (${money(sum(it,x=>x.value))})?`))return;
- const d=new Date().toLocaleDateString('pt-BR');it.forEach(x=>data.paid[seqKey(s)+'_'+x.id]={date:d,late:s<todaySeq});save();toast(`${seqLabel(s)}: itens marcados como pagos.`)}
+function mark(id){if(isCardId(id))return openCardPay(ym().seq,id);const{y,m}=ym(),k=key(y,m)+'_'+id;if(data.paid[k])delete data.paid[k];else data.paid[k]={date:new Date().toLocaleDateString('pt-BR')};save()}
+function payLate(s,id){if(isCardId(id)){const rem=cardRemainder(s,id);if(rem>0)addCardPay(seqKey(s),id,rem,isoToday());save();toast('Saldo da fatura pago.');return}
+ data.paid[seqKey(s)+'_'+id]={date:new Date().toLocaleDateString('pt-BR'),late:true};save();toast('Pendência paga.')}
+function payMonth(s){const it=paymentsFor(s).filter(x=>x.type!=='income'&&!isPaid(s,x.id)&&!(x.type==='card'&&s<ym().seq&&cardAbsorbed(s,x.id)));if(!it.length)return;
+ if(!confirm(`Marcar como pagos os ${it.length} itens em aberto de ${seqLabel(s)} (${money(sum(it,x=>r2(x.value-paidValue(s,x))))})?`))return;
+ const d=new Date().toLocaleDateString('pt-BR');it.forEach(x=>{if(x.type==='card'){const rem=r2(x.value-paidValue(s,x));if(rem>0)addCardPay(seqKey(s),x.id,rem,isoToday())}else data.paid[seqKey(s)+'_'+x.id]={date:d,late:s<todaySeq}});save();toast(`${seqLabel(s)}: itens marcados como pagos.`)}
 function payAllMonth(){payMonth(ym().seq)}
 $('ctrlStart').onchange=()=>{const v=$('ctrlStart').value;data.settings.startKey=v||null;if(v&&data.settings.pendingStart&&keySeq(data.settings.pendingStart)<keySeq(v))data.settings.pendingStart=v;save();toast(v?`Controle a partir de ${seqLabel(keySeq(v))}.`:'Considerando todos os meses.')};
 $('pendStart').onchange=()=>{data.settings.pendingStart=$('pendStart').value;save();toast('Início do controle de pendências atualizado.')};
@@ -874,7 +926,9 @@ $('installForm').onsubmit=guard(()=>{
  if(editingInstall){const id=editingInstall;data.installments=data.installments.map(a=>a.id===id?{...a,...rec,id}:a);msg='Parcelamento atualizado.'}else{data.installments.push({id:data.nextId++,...rec});msg='Parcelamento salvo.'}
  cancelInstallEdit();save();toast(msg)});
 function delInstall(id){if(confirm('Excluir parcelamento?')){data.installments=data.installments.filter(x=>x.id!==id);if(editingInstall===id)cancelInstallEdit();save();toast('Parcelamento excluído.')}}
-$('cardForm').onsubmit=guard(()=>{const v=num('visa',{min:0,label:'Visa',required:false}),m=num('master',{min:0,label:'Mastercard',required:false});data.cards[key(+$('year').value,+$('month').value)]={visa:v,master:m};save();toast('Faturas salvas!')});
+$('cardForm').onsubmit=guard(()=>{const v=num('visa',{min:0,label:'Fatura Visa',required:false}),m=num('master',{min:0,label:'Fatura Mastercard',required:false}),vm=num('visaMin',{min:0,label:'Mínimo Visa',required:false}),mm=num('masterMin',{min:0,label:'Mínimo Mastercard',required:false});
+ if(vm>v)throw new Error('Visa: o mínimo não pode ser maior que a fatura.');if(mm>m)throw new Error('Mastercard: o mínimo não pode ser maior que a fatura.');
+ const c=cardObj(key(+$('year').value,+$('month').value));c.visa=v;c.master=m;c.min.visa=vm;c.min.master=mm;save();toast('Faturas salvas!')});
 $('reserveForm').onsubmit=guard(()=>{data.reserve={goal:num('resGoal',{min:0,label:'Meta',required:false}),saved:num('resSaved',{min:0,label:'Valor acumulado',required:false}),monthly:num('resMonthly',{min:0,label:'Aporte mensal',required:false}),percent:$('resPercent').value.trim()===''?10:num('resPercent',{min:0,max:100,label:'Percentual'})};document.activeElement?.blur();save();toast('Configuração da reserva salva.')});
 ['simTarget','simMode','simValue'].forEach(id=>$(id).addEventListener('input',runSim));$('simForm').onsubmit=e=>{e.preventDefault();runSim()};
 $('period').onchange=()=>{state.evoSel=null;state.donutSel=null;state.rankSel=null;renderDashboard()};
@@ -911,7 +965,12 @@ function buildEdit(){
   if(e.scope==='month'){title+=` — ${esc(it.name)}`;del='';html=fNum('value','Valor desta parcela (R$)',it.value,'min="0" step=".01"')+fNum('day','Dia de vencimento desta parcela',it.day,'min="1" max="31" step="1"')+(it.adjusted?`<div class="full"><button type="button" class="mini soft" onclick="clearOverride('${k}_i${e.id}')">↺ Voltar ao cadastro (${money(r.value)}, dia ${r.day})</button></div>`:'')}
   else{del='Excluir parcelamento';const st=(+r.year)*12+(+r.month);html=fIn('name','Descrição',r.name,'text','maxlength="80"',true)+fNum('value','Valor da parcela (R$)',r.value,'min="0" step=".01"')+fNum('qty','Quantidade de parcelas',r.qty,'min="1" max="600" step="1"')+fNum('day','Dia de vencimento',r.day,'min="1" max="31" step="1"')+`<label>Mês da 1ª parcela<select id="ed_month">${monthOpts(st)}</select></label>`+fCat(catOfRec(r).cat.id)}}
  else if(e.kind==='card'){const c=data.cards[k]||{visa:0,master:0},def=e.id==='visa'?8:21,o=data.overrides[k+'_'+e.id];title=`Editar fatura ${e.id==='visa'?'Visa':'Mastercard'} — ${seqLabel(e.s)}`;del='Zerar fatura';
-  html=fNum('value','Valor da fatura (R$)',c[e.id]||0,'min="0" step=".01"')+fNum('day','Dia de vencimento neste mês',(o&&o.day)||def,'min="1" max="31" step="1"')}
+  const v=+c[e.id]||0,pays=cardPays(k,e.id),leg=!pays.length&&data.paid[k+'_'+e.id],pd=r2(cardPaidAmt(k,e.id,v)),rem=r2(Math.max(0,v-pd)),prev=cardRemainder(e.s-1,e.id),ab=!!(c.roll&&c.roll[e.id]);
+  html=fNum('value','Valor da fatura (R$)',v,'min="0" step=".01"')+fNum('min','Valor mínimo (R$)',cardMin(k,e.id),'min="0" step=".01"')+fNum('day','Dia de vencimento neste mês',(o&&o.day)||def,'min="1" max="31" step="1"')+
+  `<div class="full" style="font-size:13px;padding:8px 10px;background:#f8fafc;border-radius:10px">Pago <b class="pos">${money(pd)}</b> · Em aberto <b class="${rem>0.005?'neg':''}">${money(rem)}</b>${rem>0.005?`<br><small class="muted">Sem quitação neste mês, o saldo vai para ${seqLabel(e.s+1)} como pendência.</small>`:''}</div>`+
+  `<div class="full"><b style="font-size:13px">Pagamentos lançados</b>${pays.map(p=>`<div class="cbpay" style="display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:13px;padding:5px 0;border-bottom:1px dashed var(--line)"><span>${esc(fmtD(p.date))||'—'} · <b>${money(p.value)}</b></span><button type="button" class="mini" onclick="delCardPay('${k}','${e.id}',${p.id})">×</button></div>`).join('')}${leg?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0"><span>Marcado como pago (valor integral)</span><button type="button" class="mini" onclick="delCardPay('${k}','${e.id}','legacy')">×</button></div>`:''}${!pays.length&&!leg?'<div class="muted" style="font-size:13px">Nenhum pagamento lançado.</div>':''}</div>`+
+  fNum('pv','Novo pagamento (R$)',e.pay&&rem>0?rem:'','min="0" step=".01" placeholder="0,00"')+fIn('pd','Data do pagamento',isoToday(),'date')+
+  (prev>0.005?`<label class="full chk"><input id="ed_roll" type="checkbox"${ab?' checked':''}> A fatura deste mês já inclui o saldo não pago de ${seqLabel(e.s-1)} (${money(prev)})</label>`:'')}
  $('edTitle').innerHTML=title;$('edScope').innerHTML=scope;$('edFields').innerHTML=html;
  $('edDelete').style.display=del?'inline-flex':'none';$('edDelete').textContent=del;
  $('edScope').querySelectorAll('[data-scope]').forEach(b=>b.onclick=()=>{state.ed.scope=b.dataset.scope;buildEdit()});
@@ -931,7 +990,10 @@ $('editForm').onsubmit=guard(()=>{const e=state.ed;if(!e)return;const k=seqKey(e
   if(v===+r.value&&d===+r.day)delete data.overrides[ok];else data.overrides[ok]={value:v,day:d}}
  else if(e.kind==='fixed'){Object.assign(r,{name:txt('ed_name','a descrição'),value:num('ed_value',{min:0,label:'Valor mensal'}),day:day(),cat:$('ed_cat').value})}
  else if(e.kind==='install'){const st=+$('ed_month').value;Object.assign(r,{name:txt('ed_name','a descrição'),value:num('ed_value',{min:0,label:'Valor da parcela'}),qty:num('ed_qty',{min:1,max:600,int:true,label:'Quantidade'}),day:day(),year:Math.floor(st/12),month:st%12,cat:$('ed_cat').value})}
- else if(e.kind==='card'){const v=num('ed_value',{min:0,label:'Valor da fatura'}),d=day(),def=e.id==='visa'?8:21;data.cards[k]=data.cards[k]||{visa:0,master:0};data.cards[k][e.id]=v;
+ else if(e.kind==='card'){const v=num('ed_value',{min:0,label:'Valor da fatura'}),mn=num('ed_min',{min:0,label:'Valor mínimo',required:false}),pv=num('ed_pv',{min:0,label:'Novo pagamento',required:false}),d=day(),def=e.id==='visa'?8:21;
+  if(mn>v)throw new Error('O mínimo não pode ser maior que a fatura.');const c=cardObj(k);c[e.id]=v;c.min[e.id]=mn;
+  const rl=$('ed_roll');if(rl){if(rl.checked)c.roll[e.id]=true;else delete c.roll[e.id]}
+  if(pv>0)addCardPay(k,e.id,pv,$('ed_pd').value||isoToday());
   if(d!==def)data.overrides[k+'_'+e.id]={day:d};else delete data.overrides[k+'_'+e.id]}
  closeEdit();save();toast('Lançamento atualizado.')});
 $('edDelete').onclick=()=>{const e=state.ed;if(!e)return;const before=JSON.stringify(data);
