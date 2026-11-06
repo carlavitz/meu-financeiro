@@ -23,11 +23,20 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 8px
 .full{grid-column:1/-1}.section{margin-top:18px}.muted{color:var(--muted)}.empty{text-align:center;padding:25px;color:var(--muted)}
 @media(max-width:850px){.layout{grid-template-columns:1fr}table{font-size:13px}th,td{padding:8px 4px}}
 </style>
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#312e81">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="Meu Financeiro">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+
 </head>
 <body>
 <header><h1>Meu Financeiro</h1><p>Organização simples, visão clara do seu mês.</p></header>
 <main>
 <div class="toolbar">
+<button id="installAppBtn" class="soft" type="button" style="display:none">＋ Instalar aplicativo</button>
 <label>Mês <select id="month"></select></label><label>Ano <select id="year"></select></label>
 <button class="primary" onclick="exportData()">Exportar backup</button>
 <button onclick="document.getElementById('importFile').click()">Importar backup</button>
@@ -151,4 +160,42 @@ function exportData(){let b=new Blob([JSON.stringify(data,null,2)],{type:'applic
 function importData(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);if(!d.fixed||!d.installments)throw 0;data=d;save();alert('Backup importado!')}catch{alert('Arquivo inválido')}};r.readAsText(f)}
 initSelectors();render();
 </script>
+
+<script>
+// Instalação PWA no Chrome para Android
+let deferredInstallPrompt = null;
+const installAppBtn = document.getElementById('installAppBtn');
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  if (installAppBtn) installAppBtn.style.display = 'inline-block';
+});
+
+if (installAppBtn) {
+  installAppBtn.addEventListener('click', async () => {
+    if (!deferredInstallPrompt) {
+      alert('Para instalar, abra o menu ⋮ do Chrome e escolha "Instalar app" ou "Adicionar à tela inicial".');
+      return;
+    }
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    installAppBtn.style.display = 'none';
+  });
+}
+
+window.addEventListener('appinstalled', () => {
+  if (installAppBtn) installAppBtn.style.display = 'none';
+});
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((error) => {
+      console.error('Falha ao registrar Service Worker:', error);
+    });
+  });
+}
+</script>
+
 </body></html>
