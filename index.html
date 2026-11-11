@@ -248,7 +248,7 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
 
 <div class="layout section">
 <section class="panel"><h2>Calendário do mês <span class="muted" id="ref"></span></h2>
-<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" type="button" onclick="toggleIncomeForm()">＋ Incluir receita</button><button class="primary" type="button" onclick="toggleOneOffForm()">＋ Lançar despesa</button><button class="soft" type="button" onclick="payAllMonth()">✓ Marcar mês todo como pago</button></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" type="button" onclick="toggleIncomeForm()">＋ Incluir receita</button><button class="soft" type="button" onclick="payAllMonth()">✓ Marcar mês todo como pago</button></div>
 <form id="incomeForm" class="formgrid" style="display:none;margin:12px 0" novalidate>
 <label class="full">Descrição da receita<input id="rName" required maxlength="80" placeholder="Ex.: Salário, renda extra"></label>
 <label>Dia<input id="rDay" type="number" min="1" max="31" value="5" required inputmode="numeric"></label>
@@ -260,14 +260,13 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
 <div class="full"><button class="primary" type="submit">Salvar receita no mês</button> <button type="button" onclick="$('incomeForm').style.display='none'">Cancelar</button></div></form>
 <div style="overflow-x:auto;margin-top:8px"><table class="rtable"><thead><tr><th>Dia</th><th>Descrição</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody id="calendar"></tbody></table></div>
 <h2 style="margin-top:22px">Despesas avulsas do mês</h2>
-<div id="oneOffList"></div>
-<form id="oneOffForm" class="formgrid" style="display:none;margin:12px 0 14px" novalidate>
+<form id="oneOffForm" class="formgrid" style="margin-bottom:14px" novalidate>
 <label class="full">Descrição<input id="oName" required maxlength="80" placeholder="Ex.: Farmácia, mercado, manutenção"></label>
 <label>Dia<input id="oDay" type="number" min="1" max="31" value="10" required inputmode="numeric"></label>
 <label>Valor (R$)<input id="oValue" type="number" min="0" step=".01" required inputmode="decimal"></label>
 <label class="full">Categoria<select id="oCat"></select></label>
 <div class="full"><button class="primary" type="submit">＋ Lançar despesa avulsa neste mês</button></div>
-</form>
+</form><div id="oneOffList"></div>
 </section>
 <section class="panel"><h2 id="formTitle">Adicionar despesa fixa</h2>
 <form id="expenseForm" class="formgrid" novalidate>
@@ -618,7 +617,7 @@ function renderLanc(cur){
   const paid=data.paid[key(y,m)+'_'+x.id];
   return `<tr><td data-label="Dia">${x.day}</td><td data-label="Descrição" class="title"><span>${esc(x.name)}<br><span class="tagline">${ctag(x)}${x.adjusted?'<span class="ctag" style="background:#fef3c7">ajustado neste mês</span>':''}</span></span></td><td data-label="Valor">${money(x.value)}</td><td data-label="Status"><span class="status ${paid?'paid':''}">${paid?'Pago':'Pendente'}${paid&&paid.date?' · '+esc(paid.date):''}</span></td><td data-label=""><div class="rowactions"><button type="button" class="mini ${paid?'':'soft'}" onclick="mark('${x.id}')">${paid?'Desfazer':'Pagar'}</button><button type="button" class="mini" onclick="openItem(${seq},'${x.id}')">Editar</button></div></td></tr>`}).join('')||'<tr><td colspan="5" class="empty">Nenhum pagamento neste mês.</td></tr>';
  $('fixedList').innerHTML=data.fixed.map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center"><span>${esc(x.name)}<small class="muted"> dia ${x.day} · ${money(x.value)}</small><br>${ctag({type:'fixed',ref:x})}</span><span style="white-space:nowrap"><button type="button" class="mini" onclick="openEdit('fixed',${x.id})">Editar</button> <button type="button" class="mini" onclick="delFixed(${x.id})" aria-label="Excluir">×</button></span></div>`).join('')||'<p class="muted">Nenhuma despesa fixa cadastrada.</p>';
- $('oneOffList').innerHTML=data.oneOffs.filter(x=>x.monthKey===key(y,m)).sort((a,b)=>a.day-b.day||a.id-b.id).map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center"><span>${esc(x.name)}<small class="muted"> dia ${x.day} · ${money(x.value)}</small><br>${ctag({type:'oneoff',ref:x})}</span><span style="white-space:nowrap"><button type="button" class="mini soft" onclick="openEdit('oneoff',${x.id},${seq})">Editar</button> <button type="button" class="mini" onclick="delOneOff(${x.id})">Excluir</button></span></div>`).join('')||'<p class="muted">Nenhuma despesa avulsa lançada neste mês.</p>';
+ $('oneOffList').innerHTML=data.oneOffs.filter(x=>x.monthKey===key(y,m)).map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center"><span>${esc(x.name)}<small class="muted"> dia ${x.day} · ${money(x.value)}</small><br>${ctag({type:'oneoff',ref:x})}</span><span style="white-space:nowrap"><button type="button" class="mini soft" onclick="openEdit('oneoff',${x.id},${seq})">Editar</button> <button type="button" class="mini" onclick="delOneOff(${x.id})">Excluir</button></span></div>`).join('')||'<p class="muted">Nenhuma despesa avulsa lançada neste mês.</p>';
  $('installList').innerHTML=data.installments.map(x=>{const st=(+x.year)*12+(+x.month),en=st+(+x.qty)-1;
   return `<tr${editingInstall===x.id?' style="background:#fef9c3"':''}><td data-label="Descrição" class="title"><span>${esc(x.name)}<br>${ctag({type:'install',ref:x})}</span></td><td data-label="Parcela">${money(x.value)}<small>dia ${x.day}</small></td><td data-label="Qtd.">${x.qty}</td><td data-label="Período">${seqLabel(st)} até ${seqLabel(en)}</td><td data-label=""><div class="rowactions"><button type="button" class="mini soft" onclick="openEdit('install',${x.id})">Editar</button><button type="button" class="mini" onclick="delInstall(${x.id})">Excluir</button></div></td></tr>`}).join('')||'<tr><td colspan="5" class="empty">Nenhum parcelamento.</td></tr>';
  const ck=key(y,m),c=cardRec(ck);$('visa').value=c.visa||0;$('master').value=c.master||0;$('visaMin').value=cardMin(ck,'visa')||0;$('masterMin').value=cardMin(ck,'master')||0;
@@ -883,11 +882,8 @@ function runSim(){const out=$('simResult');if(!simCache)return;
 ['eCat','oCat','iCat'].forEach(id=>$(id).addEventListener('change',()=>$(id).dataset.touched='1'));
 [['eName','eCat'],['oName','oCat'],['iName','iCat']].forEach(([n,c])=>$(n).addEventListener('input',()=>{if(!$(c).dataset.touched)$(c).value=suggestCat($(n).value)||'outros'}));
 const resetCatSel=id=>{delete $(id).dataset.touched;$(id).value='outros'};
-function toggleOneOffForm(){const f=$('oneOffForm');f.style.display=f.style.display==='none'?'grid':'none'}\n$('oneOffForm').onsubmit=guard(()=>{const name=txt('oName','a descrição'),day=num('oDay',{min:1,max:31,int:true,label:'Dia'}),value=num('oValue',{min:0.01,label:'Valor'});
- const monthKey=key(+$('year').value,+$('month').value),id=data.nextId++;
- data.oneOffs.push({id,name,day,value,cat:$('oCat').value,monthKey});
- data.paid[monthKey+'_'+id]={date:new Date().toLocaleDateString('pt-BR')};
- $('oneOffForm').reset();$('oDay').value=10;resetCatSel('oCat');save();toast('Despesa avulsa lançada.')});
+$('oneOffForm').onsubmit=guard(()=>{const name=txt('oName','a descrição'),day=num('oDay',{min:1,max:31,int:true,label:'Dia'}),value=num('oValue',{min:0.01,label:'Valor'});
+ data.oneOffs.push({id:data.nextId++,name,day,value,cat:$('oCat').value,monthKey:key(+$('year').value,+$('month').value)});$('oneOffForm').reset();$('oDay').value=10;resetCatSel('oCat');save();toast('Despesa avulsa lançada.')});
 function delOneOff(id){if(confirm('Excluir esta despesa avulsa?')){data.oneOffs=data.oneOffs.filter(x=>x.id!==id);save();toast('Despesa avulsa excluída.')}}
 function toggleIncomeForm(){const f=$('incomeForm');f.style.display=f.style.display==='none'?'grid':'none'}
 $('incomeForm').onsubmit=guard(()=>{const name=txt('rName','a descrição da receita'),day=num('rDay',{min:1,max:31,int:true,label:'Dia'}),value=num('rValue',{min:0.01,label:'Valor'});
