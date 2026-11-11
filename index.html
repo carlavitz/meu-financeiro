@@ -260,13 +260,14 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
 <div class="full"><button class="primary" type="submit">Salvar receita no mês</button> <button type="button" onclick="$('incomeForm').style.display='none'">Cancelar</button></div></form>
 <div style="overflow-x:auto;margin-top:8px"><table class="rtable"><thead><tr><th>Dia</th><th>Descrição</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody id="calendar"></tbody></table></div>
 <h2 style="margin-top:22px">Despesas avulsas do mês</h2>
-<form id="oneOffForm" class="formgrid" style="margin-bottom:14px" novalidate>
+<div id="oneOffList"></div>
+<form id="oneOffForm" class="formgrid" style="margin:12px 0 14px" novalidate>
 <label class="full">Descrição<input id="oName" required maxlength="80" placeholder="Ex.: Farmácia, mercado, manutenção"></label>
 <label>Dia<input id="oDay" type="number" min="1" max="31" value="10" required inputmode="numeric"></label>
 <label>Valor (R$)<input id="oValue" type="number" min="0" step=".01" required inputmode="decimal"></label>
 <label class="full">Categoria<select id="oCat"></select></label>
 <div class="full"><button class="primary" type="submit">＋ Lançar despesa avulsa neste mês</button></div>
-</form><div id="oneOffList"></div>
+</form>
 </section>
 <section class="panel"><h2 id="formTitle">Adicionar despesa fixa</h2>
 <form id="expenseForm" class="formgrid" novalidate>
@@ -883,7 +884,10 @@ function runSim(){const out=$('simResult');if(!simCache)return;
 [['eName','eCat'],['oName','oCat'],['iName','iCat']].forEach(([n,c])=>$(n).addEventListener('input',()=>{if(!$(c).dataset.touched)$(c).value=suggestCat($(n).value)||'outros'}));
 const resetCatSel=id=>{delete $(id).dataset.touched;$(id).value='outros'};
 $('oneOffForm').onsubmit=guard(()=>{const name=txt('oName','a descrição'),day=num('oDay',{min:1,max:31,int:true,label:'Dia'}),value=num('oValue',{min:0.01,label:'Valor'});
- data.oneOffs.push({id:data.nextId++,name,day,value,cat:$('oCat').value,monthKey:key(+$('year').value,+$('month').value)});$('oneOffForm').reset();$('oDay').value=10;resetCatSel('oCat');save();toast('Despesa avulsa lançada.')});
+ const monthKey=key(+$('year').value,+$('month').value),id=data.nextId++;
+ data.oneOffs.push({id,name,day,value,cat:$('oCat').value,monthKey});
+ data.paid[monthKey+'_'+id]={date:new Date().toLocaleDateString('pt-BR')};
+ $('oneOffForm').reset();$('oDay').value=10;resetCatSel('oCat');save();toast('Despesa avulsa lançada.')});
 function delOneOff(id){if(confirm('Excluir esta despesa avulsa?')){data.oneOffs=data.oneOffs.filter(x=>x.id!==id);save();toast('Despesa avulsa excluída.')}}
 function toggleIncomeForm(){const f=$('incomeForm');f.style.display=f.style.display==='none'?'grid':'none'}
 $('incomeForm').onsubmit=guard(()=>{const name=txt('rName','a descrição da receita'),day=num('rDay',{min:1,max:31,int:true,label:'Dia'}),value=num('rValue',{min:0.01,label:'Valor'});
