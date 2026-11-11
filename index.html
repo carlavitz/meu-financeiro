@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Meu Financeiro</title>
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#312e81">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Meu Financeiro">
 <meta name="application-name" content="Meu Financeiro">
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <style>
 :root{--bg:#f4f6fb;--card:#fff;--ink:#172033;--muted:#697386;--line:#e7eaf1;--primary:#4f46e5;--green:#0f9f78;--red:#dc3545;--amber:#d97706;
  --c-fixed:#4f46e5;--c-card:#f59e0b;--c-install:#0ea5e9;--c-oneoff:#ec4899;--c-income:#0f9f78;--c-exp:#dc3545;--navh:0px}
@@ -379,7 +379,7 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
 </main>
 <footer>
 <p>🔒 Dados salvos <b>somente neste navegador/aparelho</b>. Não sincronizam entre celular e computador — use Exportar/Importar backup. Limpar os dados do navegador apaga os lançamentos.</p>
-<p>Meu Financeiro · versão <span id="appVersion"></span></p>
+<p>Meu Financeiro · versão <span id="appVersion"></span> · <button id="checkUpdateBtn" type="button" class="mini soft" style="font-size:12px">Verificar atualização</button></p>
 </footer>
 <dialog id="editDlg"><form id="editForm" class="formgrid" novalidate>
 <div class="full"><h2 id="edTitle"></h2><div id="edScope"></div></div>
@@ -391,7 +391,7 @@ footer{max-width:1200px;margin:0 auto 30px;padding:0 16px;font-size:12px;color:v
 
 <script>
 'use strict';
-const APP_VERSION='2.3.1';
+const APP_VERSION='2.3.2';
 const STORAGE_KEY='meuFinanceiroV1';   // mesma chave da versão 1: dados existentes preservados
 const SCHEMA_VERSION=3;
 const months=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -458,7 +458,8 @@ function migrate(d){
  if(!d.categories.some(c=>c.id==='outros'))d.categories.push({id:'outros',name:'Outros',color:'#94a3b8'});
  d.settings=obj(d.settings);if(!('pendingStart' in d.settings))d.settings.pendingStart=null;
  if(!d.settings.incomeBasis)d.settings.incomeBasis='cash';
- if(!('startKey' in d.settings))d.settings.startKey='2026-11'; // início do controle financeiro (meses anteriores não são considerados)if(!('satBD' in d.settings))d.settings.satBD=true;
+ if(!('startKey' in d.settings))d.settings.startKey='2026-11'; // início do controle financeiro
+ if(!('satBD' in d.settings))d.settings.satBD=true;
  d.overrides=obj(d.overrides);
  let maxId=0;[d.fixed,d.installments,d.oneOffs,d.incomes].forEach(a=>a.forEach(x=>{const n=+x.id;if(isFinite(n)&&n>maxId)maxId=n}));
  d.nextId=Math.max(+d.nextId||0,maxId+1);
@@ -1057,6 +1058,16 @@ function showTab(t){state.tab=t;document.querySelectorAll('.tab').forEach(s=>s.c
  $('compBar').style.display=(t==='dash'||t==='cat')?'none':'flex';window.scrollTo({top:0,behavior:'smooth'})}
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 $('appVersion').textContent=APP_VERSION;
+// Revalida o Service Worker sem apagar dados financeiros (localStorage).
+$('checkUpdateBtn').addEventListener('click',async()=>{
+ if(!navigator.onLine){toast('Sem conexão. A atualização depende de internet.','error');return}
+ const button=$('checkUpdateBtn');button.disabled=true;button.textContent='Verificando...';
+ try{
+  if('serviceWorker' in navigator){const registration=await navigator.serviceWorker.getRegistration('./');if(registration)await registration.update()}
+  const url=new URL(location.href);url.searchParams.set('_versao',Date.now().toString());
+  location.assign(url.toString());
+ }catch(err){button.disabled=false;button.textContent='Verificar atualização';toast('Não foi possível verificar. Confira a publicação no GitHub.','error')}
+});
 initSelectors();render();showTab('dash');
 </script>
 
@@ -1069,7 +1080,7 @@ if(installAppBtn)installAppBtn.addEventListener('click',async()=>{if(!deferredIn
 window.addEventListener('appinstalled',()=>{if(installAppBtn)installAppBtn.style.display='none'});
 if('serviceWorker' in navigator){let refreshing=false;
  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;location.reload()});
- window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'}).then(reg=>{
+ window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'}).then(reg=>{
   const offer=w=>{document.getElementById('updateBar').style.display='flex';document.getElementById('updateBtn').onclick=()=>w.postMessage({type:'SKIP_WAITING'})};
   if(reg.waiting&&navigator.serviceWorker.controller)offer(reg.waiting);
   reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)offer(w)})});
