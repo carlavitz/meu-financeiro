@@ -1,8 +1,8 @@
-/* Meu Financeiro — Service Worker 2.3.3
+/* Meu Financeiro — Service Worker 2.3.4
    HTML: rede primeiro, cache somente quando estiver offline.
    Dados financeiros ficam no localStorage; este worker NÃO os apaga.
 */
-const CACHE_NAME='meu-financeiro-cache-2.3.3';
+const CACHE_NAME='meu-financeiro-cache-2.3.4';
 const CACHE_PREFIX='meu-financeiro-cache-';
 const INDEX_URL=new URL('./index.html',self.registration.scope).href;
 
